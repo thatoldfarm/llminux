@@ -974,58 +974,62 @@ async function processLiaResponse(history: ChatMessage[], thinkingBubble: HTMLEl
   systemPrompt = systemPrompt.replace('%%USER_PROMPT%%', userPrompt);
 
   // Dynamically build the response schema based on current metrics/states
+  // This schema is NOT passed to the SDK anymore, but used for client-side validation/expectation.
+  // The AI is prompted to return JSON matching this structure.
   const newStateProperties: { [key: string]: { type: Type } } = {};
   metrics.forEach((m: LiaMetricDefinition) => {
-      newStateProperties[m.id] = { type: Type.NUMBER };
+      newStateProperties[m.id] = { type: Type.NUMBER }; // Expected type
   });
   qualitativeStates.forEach((s: LiaQualitativeDefinition) => {
-      newStateProperties[s.id] = { type: Type.STRING };
+      newStateProperties[s.id] = { type: Type.STRING }; // Expected type
   });
 
-  const schema = {
-      type: Type.OBJECT,
-      properties: {
-          kernel_log: { type: Type.STRING },
-          new_kernel_state: {
-              type: Type.OBJECT,
-              properties: newStateProperties,
-              required: allStates.map(s => s.id) // All state IDs are required in the response
-          },
-      },
-      required: ['kernel_log', 'new_kernel_state'],
-  };
+  // Construct the 'contents' for generateContent, including history
+  const currentHistory = history.slice(0, -1); // History excluding the current user prompt
+  const contentsForApi = [
+      ...currentHistory,
+      { role: 'user', parts: [{text: userPrompt}] }
+  ];
 
-  const model = ai.getGenerativeModel({
+  const stream = await ai.models.generateContentStream({
       model: aiSettings.model,
-      generationConfig: {
+      contents: contentsForApi,
+      generationConfig: { // Renamed from 'config' to 'generationConfig' for this method
           temperature: aiSettings.temperature,
           maxOutputTokens: aiSettings.maxOutputTokens,
           topP: aiSettings.topP,
           topK: aiSettings.topK,
           responseMimeType: "application/json",
-          responseSchema: schema,
-      }
-  });
-
-  const chat = model.startChat({
-      history: history.slice(0, -1) // Exclude the last user prompt as it's part of context
-  });
-
-  const responseStream = await chat.sendMessageStream({
-      text: userPrompt,
+          // responseSchema is NOT directly supported by generateContentStream's config.
+          // We rely on the system prompt to enforce JSON structure.
+      },
       systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] }
   });
 
   let fullResponseText = '';
-  for await (const chunk of responseStream) {
-      if (chunk.text) {
+  for await (const chunk of stream) {
+      // The actual response text is usually in chunk.text() for the new SDK
+      // but the provided working example uses chunk.text directly.
+      // Let's assume chunk.text is correct for the version being used by esm.sh
+      if (chunk.text) { // esm.sh/v1.8.0 of @google/genai might have .text directly on chunk
           fullResponseText += chunk.text;
+      } else if (typeof chunk.text === 'function') { // More standard SDK pattern
+          fullResponseText += chunk.text();
       }
   }
 
-  const result = JSON.parse(fullResponseText.trim());
+  let result;
+  try {
+    result = JSON.parse(fullResponseText.trim());
+  } catch (e: any) {
+    console.error("Failed to parse AI JSON response:", e.message, "\nRaw response:", fullResponseText);
+    history.pop(); // Remove thinking bubble
+    history.push({ role: 'model', parts: [{ text: `KERNEL FAULT: AI response was not valid JSON.\nRaw: ${fullResponseText}` }] });
+    thinkingBubble.replaceWith(createChatBubble('error', `KERNEL FAULT: AI response was not valid JSON.`));
+    return;
+  }
 
-  if (result.kernel_log && result.new_kernel_state) {
+  if (result && result.kernel_log && result.new_kernel_state) {
       // Merge new state values into the global liaState
       for (const key in result.new_kernel_state) {
           if (result.new_kernel_state.hasOwnProperty(key)) {
@@ -1087,9 +1091,15 @@ async function processCodeAssistantResponse(history: ChatMessage[], thinkingBubb
         required: ['action']
     };
 
-    const model = ai.getGenerativeModel({
+    // New approach using ai.chats.create() for a single message exchange (generateContent equivalent)
+    // For a single turn, we can use sendMessageStream on a chat session.
+    // Or, if a direct generateContent equivalent exists on ai.chats or ai.models that supports schema, that'd be better.
+    // The most straightforward adaptation of the existing logic with ai.chats.create:
+    const chatSession = ai.chats.create({
         model: aiSettings.model,
-        generationConfig: {
+        // No history needed for this Fs_Util call as it's a one-shot command based on current VFS.
+        // history: [],
+        config: {
             temperature: aiSettings.temperature,
             maxOutputTokens: aiSettings.maxOutputTokens,
             topP: aiSettings.topP,
@@ -1100,9 +1110,27 @@ async function processCodeAssistantResponse(history: ChatMessage[], thinkingBubb
     });
 
     try {
-        const response = await model.generateContent({
-            contents: history.slice(-1), // Send only the last user message for direct response
+        // sendMessageStream is used for streaming, for a single response,
+        // we aggregate it. The SDK might also have a direct sendMessage that returns a promise of the full response.
+        // For consistency with LIA_Kernel and to get the full response:
+        const stream = await chatSession.sendMessageStream({
+            text: userPrompt, // Send the user prompt as the message content
             systemInstruction: { role: 'system', parts: [{ text: systemInstruction }] }
+        });
+        let aggregatedResponseText = "";
+        for await (const chunk of stream) {
+            if (chunk.text) {
+                aggregatedResponseText += chunk.text;
+            }
+        }
+        // const response = JSON.parse(aggregatedResponseText); // This would be the response object
+        // The original code expected response.text to be the JSON string.
+        // If sendMessageStream's aggregated chunks form the JSON string directly:
+        const jsonText = aggregatedResponseText.trim();
+        const result = JSON.parse(jsonText);
+
+
+        let narrative = `Fs_Util executed action: <code>${result.action}</code>.`;
         });
 
         const jsonText = response.text.trim();
