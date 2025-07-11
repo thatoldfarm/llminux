@@ -166,7 +166,9 @@ async function main() {
     return;
   }
   apiKey = process.env.API_KEY;
-  ai = new GoogleGenAI({ apiKey });
+  // Try instantiating by passing the API key directly as a string
+  // as shown in some SDK examples, instead of an options object.
+  ai = new GoogleGenAI(apiKey); // Initialization happens here
 
   await loadState(); // Load historical state and AI settings
   await loadAllJsonFilesIntoVFS(); // Load all JSONs from public/
