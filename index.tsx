@@ -92,7 +92,12 @@ let ai: GoogleGenAI;
 let apiKey: string;
 
 // Update this to the new JSON file name
-const LIA_BOOTSTRAP_FILENAME = './LIA_MASTER_BOOTSTRAP_v7.1_Absolute_Kernel_Root_Edition_Refined.json';
+const LIA_BOOTSTRAP_FILENAME = 'LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json'; // Relative to public/
+const ALL_JSON_FILES_TO_LOAD = [
+    'LIA_MASTER_BOOTSTRAP_v7.1_Absolute_Kernel_Root_Edition_Refined.json',
+    'LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json',
+    'LIA_UTILITIES_MODULE_v1.0_Systemd_Extensions.json'
+];
 // These are now conceptual folder names. Update based on `VIRTUAL_FILESYSTEM_HIERARCHY`
 // For simplicity, we'll prefix them for the VFS but the JSON shows them as standard Linux paths.
 // The `createFileElement` will handle displaying only the file name inside the conceptual folder.
@@ -138,7 +143,7 @@ if (root) {
   // We explicitly load it from the build artifact or provide a dummy initially.
   // In a real scenario, this would be fetched or embedded by the build process.
   // For now, let's keep it empty as it's sourced from the pre-provided file.
-  { name: LIA_BOOTSTRAP_FILENAME, content: `{}`, active: false },
+  // { name: LIA_BOOTSTRAP_FILENAME, content: `{}`, active: false }, // Removed old single bootstrap placeholder
 ];
 
 // --- Marked Customization for Code Blocks ---
@@ -162,29 +167,62 @@ async function main() {
   ai = new GoogleGenAI({ apiKey });
 
   await loadState(); // Load historical state and AI settings
+  await loadAllJsonFilesIntoVFS(); // Load all JSONs from public/
   initializeEventListeners();
-  renderFileTree();
-  // Ensure the bootstrap file exists and its content is loaded
-  let bootstrapFileContent = await fetch(LIA_BOOTSTRAP_FILENAME).then(res => res.text()).catch(err => {
-    console.error("Failed to fetch LIA Bootstrap file:", err);
-    return "{}"; // Return empty object on error
-  });
-  // Update the VFS with the fetched bootstrap content
-  let bootstrapVfsEntry = vfsFiles.find(f => f.name === LIA_BOOTSTRAP_FILENAME);
-  if (bootstrapVfsEntry) {
-      bootstrapVfsEntry.content = bootstrapFileContent;
-  } else {
-      vfsFiles.push({ name: LIA_BOOTSTRAP_FILENAME, content: bootstrapFileContent, active: false });
-  }
+  renderFileTree(); // Render tree after all files are loaded
 
-  // Handle initial LIA state (bootstrap or saved) after fetching new bootstrap content
+  // Handle initial LIA state (bootstrap or saved)
   // This ensures the LIA state variables are correctly initialized from the LIA_BOOTSTRAP_FILENAME content.
-  if (Object.keys(liaState).length === 0 || !liaState.KCS) { // Only reset if state is empty or missing a key metric
-      resetLiaState();
+  // resetLiaState is called within loadAllJsonFilesIntoVFS after the primary bootstrap is loaded.
+  if (Object.keys(liaState).length === 0 || !liaState.KCS) {
+    // This check might be redundant if resetLiaState is reliably called after bootstrap load
+    console.warn("LIA state was not initialized by loadAllJsonFilesIntoVFS, attempting reset.");
+    resetLiaState();
   }
 
   await switchFile(getActiveFile()?.name || 'index.html');
   // Initial render of tabs will be handled by switchFile -> switchTab
+}
+
+async function loadAllJsonFilesIntoVFS() {
+  for (const jsonFileName of ALL_JSON_FILES_TO_LOAD) {
+    // Construct the path assuming files are directly in 'public/' and fetch needs a path relative to the HTML file.
+    const filePath = `./${jsonFileName}`;
+    try {
+      const response = await fetch(filePath);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status} for ${jsonFileName}`);
+      }
+      const fileContent = await response.text();
+      let vfsEntry = vfsFiles.find(f => f.name === jsonFileName);
+      if (vfsEntry) {
+        vfsEntry.content = fileContent;
+      } else {
+        // Add the file to VFS. These are conceptual paths, so just the filename is fine for `name`.
+        vfsFiles.push({ name: jsonFileName, content: fileContent, active: false });
+      }
+      console.log(`Successfully loaded ${jsonFileName} into VFS.`);
+
+      // If this is the primary bootstrap file, reset LIA state immediately after loading it,
+      // but only if liaState hasn't been populated from localStorage already.
+      if (jsonFileName === LIA_BOOTSTRAP_FILENAME) {
+        const savedLiaState = localStorage.getItem('lia_liaState');
+        if (!savedLiaState || Object.keys(JSON.parse(savedLiaState)).length === 0) {
+            console.log(`Primary bootstrap ${LIA_BOOTSTRAP_FILENAME} loaded and no saved state. Resetting LIA state.`);
+            resetLiaState();
+        } else {
+            console.log(`Primary bootstrap ${LIA_BOOTSTRAP_FILENAME} loaded, but using existing LIA state from localStorage.`);
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to fetch or update VFS for ${jsonFileName}:`, err);
+      if (!vfsFiles.some(f => f.name === jsonFileName)) {
+        vfsFiles.push({ name: jsonFileName, content: `{"error": "Failed to load ${jsonFileName}"}`, active: false });
+      }
+    }
+  }
+  // It's better to render the file tree once after all files are processed.
+  // renderFileTree(); // This will be called in main() after this function completes.
 }
 
 async function loadState() {
@@ -199,22 +237,33 @@ async function loadState() {
     const defaultFilesMap = new Map(defaultVfsFiles.map(f => [f.name, f]));
     const savedFilesMap = new Map(savedFiles.map(f => [f.name, f]));
 
-    // Start with default files, update with saved content if available, then add any new saved files
-    const mergedFiles = defaultVfsFiles.map(defaultFile => {
-      // Always use the *fetched* bootstrap content, not potentially outdated localStorage
-      if (defaultFile.name === LIA_BOOTSTRAP_FILENAME) {
-          return { ...defaultFile, content: "{}" }; // Will be filled by fetch later
-      }
-      return savedFilesMap.get(defaultFile.name) || defaultFile;
+    // Start with default files, update with saved content if available
+    let currentFiles = defaultVfsFiles.map(defaultFile => {
+        return savedFilesMap.get(defaultFile.name) || defaultFile;
     });
 
-    const newFiles = savedFiles.filter(f => !defaultFilesMap.has(f.name));
-    vfsFiles = [...mergedFiles, ...newFiles];
+    // Add any files from localStorage that are not in defaults (e.g., user-created through Fs_Util if that were a feature)
+    // or previously loaded JSONs that aren't in the current defaultVfsFiles list.
+    savedFiles.forEach(savedFile => {
+        if (!currentFiles.some(f => f.name === savedFile.name)) {
+            currentFiles.push(savedFile);
+        }
+    });
+    vfsFiles = currentFiles;
+
   } else {
     vfsFiles = [...defaultVfsFiles];
   }
 
-  // liaState will be re-initialized from bootstrap content after it's fetched
+  // Ensure all JSONs to load are represented in vfsFiles, even if just with empty content initially.
+  // Their actual content will be fetched by loadAllJsonFilesIntoVFS.
+  ALL_JSON_FILES_TO_LOAD.forEach(jsonFileName => {
+    if (!vfsFiles.some(f => f.name === jsonFileName)) {
+      vfsFiles.push({ name: jsonFileName, content: '{}', active: false });
+    }
+  });
+
+  // liaState will be re-initialized from bootstrap content after it's fetched by loadAllJsonFilesIntoVFS
   liaState = savedLiaState ? JSON.parse(savedLiaState) : {};
 
   liaChatHistory = savedLiaChat ? JSON.parse(savedLiaChat) : [];
