@@ -13,7 +13,7 @@ interface VFSFile {
   active: boolean;
 }
 // LiaState now maps directly to the IDs defined in the new JSON
-type LiaState = { [key: string]: number | string };
+type LiaState = { [key: string]: number | string | string[] }; // Extended to allow string arrays for qualitative lists
 type LiaMetricDefinition = { id: string, name: string, value_initial: number, range: [number, number], description: string, dynamics_notes?: string, critical_threshold?: number };
 type LiaQualitativeDefinition = { id: string, name: string, initial_value: string, description: string };
 type LiaBootstrap = {
@@ -88,11 +88,13 @@ let aiSettings: AiSettings = {
   expandedFolders: { 'lia_system': true, 'boot': true, 'etc': true, 'lib': true, 'sbin': true, 'usr': true, 'var': true, 'dev': true, 'home': true, 'mnt': true, 'opt': true, 'proc': true, 'root': true, 'sys': true, 'tmp': true } // Initialize based on likely common Linux dirs
 };
 let liaState: LiaState = {};
+let liaUtilitiesConfig: LiaUtilitiesConfig | null = null; // To store parsed utilities
 let ai: GoogleGenAI;
 let apiKey: string;
 
 // Update this to the new JSON file name
 const LIA_BOOTSTRAP_FILENAME = 'LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json'; // Relative to public/
+const LIA_UTILITIES_FILENAME = 'LIA_UTILITIES_MODULE_v1.0_Systemd_Extensions.json'; // Relative to public/
 const ALL_JSON_FILES_TO_LOAD = [
     'LIA_MASTER_BOOTSTRAP_v7.1_Absolute_Kernel_Root_Edition_Refined.json',
     'LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json',
@@ -214,6 +216,17 @@ async function loadAllJsonFilesIntoVFS() {
             console.log(`Primary bootstrap ${LIA_BOOTSTRAP_FILENAME} loaded, but using existing LIA state from localStorage.`);
         }
       }
+
+      // If this is the utilities file, parse it and store it.
+      if (jsonFileName === LIA_UTILITIES_FILENAME) {
+        try {
+          liaUtilitiesConfig = JSON.parse(fileContent) as LiaUtilitiesConfig;
+          console.log(`Successfully parsed ${LIA_UTILITIES_FILENAME}.`);
+        } catch (parseErr: any) {
+          console.error(`Failed to parse ${LIA_UTILITIES_FILENAME}: ${parseErr.message}`);
+          liaUtilitiesConfig = null; // Ensure it's null if parsing fails
+        }
+      }
     } catch (err) {
       console.error(`Failed to fetch or update VFS for ${jsonFileName}:`, err);
       if (!vfsFiles.some(f => f.name === jsonFileName)) {
@@ -224,6 +237,305 @@ async function loadAllJsonFilesIntoVFS() {
   // It's better to render the file tree once after all files are processed.
   // renderFileTree(); // This will be called in main() after this function completes.
 }
+
+// --- Utility Command Processing ---
+
+type ExtractedUtilityResult = {
+  utility: LiaUtilityDefinition; // The main utility category (e.g., CORE_UTILITIES.apt-get)
+  command?: LiaUtilityCommand; // The specific command if the utility has sub-commands (e.g., apt-get.install)
+  params: Record<string, string | boolean>; // Extracted parameters
+  error?: string; // Error message if parsing failed
+};
+
+function findUtilityAndExtractParams(userInput: string): ExtractedUtilityResult | null {
+  if (!liaUtilitiesConfig) return null;
+
+  const parts = userInput.trim().match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map(part => part.replace(/^['"]|['"]$/g, "")) || [];
+  if (parts.length === 0) return null;
+
+  const commandBase = parts[0]; // e.g., "apt-get" or "find"
+  let potentialCommand = parts[1]; // e.g., "install" for "apt-get"
+
+  const utilitySections = [
+    liaUtilitiesConfig.CORE_UTILITIES,
+    liaUtilitiesConfig.NETWORK_OPERATIONS,
+    liaUtilitiesConfig.SELF_EVOLUTION_PROTOCOLS,
+    liaUtilitiesConfig.RUNTIME_MONITORING,
+    liaUtilitiesConfig.FILE_SYSTEM_MAINTENANCE,
+  ];
+
+  for (const section of utilitySections) {
+    if (!section || !section.utilities) continue;
+
+    for (const utility of section.utilities) {
+      // Check if the command base matches the utility's name (e.g. `apt-get` (Conceptual Package Manager))
+      // We need to extract the actual command from the name, e.g. "apt-get" from "`apt-get` (...)"
+      const utilityCmdNameMatch = utility.name.match(/^`([^`]+)`/);
+      const utilityCmdName = utilityCmdNameMatch ? utilityCmdNameMatch[1] : utility.name;
+
+      if (utilityCmdName === commandBase) {
+        // Case 1: Utility has sub-commands (e.g., apt-get install)
+        if (utility.commands) {
+          const subCommand = utility.commands.find(cmd => cmd.cmd === potentialCommand);
+          if (subCommand) {
+            return parseParamsForCommand(userInput, utility, subCommand, parts.slice(2));
+          }
+        }
+        // Case 2: Utility is a direct command (e.g., find)
+        // For direct commands, parts[0] is the command, parts.slice(1) are its arguments
+        else if (utility.syntax) { // Check if it's a direct command
+            return parseParamsForCommand(userInput, utility, utility as LiaUtilityCommand, parts.slice(1));
+        }
+      }
+    }
+  }
+  return null; // No match found
+}
+
+function parseParamsForCommand(userInput: string, utility: LiaUtilityDefinition, commandDef: LiaUtilityCommand, args: string[]): ExtractedUtilityResult {
+  const params: Record<string, string | boolean> = {};
+  let error: string | undefined;
+
+  const syntaxParams = commandDef.syntax.match(/<[^>]+>/g) || []; // e.g., ["<package_name>", "<path>"]
+  const definedParamsConfig = commandDef.parameters || {};
+
+  let argIndex = 0;
+  let usedSyntaxParams = 0;
+
+  // Greedy match for syntax parameters first
+  for (const sp of syntaxParams) {
+    const paramName = sp.substring(1, sp.length - 1); // Remove < >
+    if (args[argIndex]) {
+      params[paramName] = args[argIndex];
+      argIndex++;
+      usedSyntaxParams++;
+    } else {
+      error = `Missing required parameter: ${paramName} for command ${commandDef.cmd || utility.name}`;
+      break;
+    }
+  }
+  if (error) return { utility, command: commandDef, params, error };
+
+
+  // Process remaining args as flags or named parameters (if any defined beyond syntax)
+  for (let i = argIndex; i < args.length; i++) {
+    const currentArg = args[i];
+    if (currentArg.startsWith("--")) {
+      const flagName = currentArg;
+      // Check if this flag is defined in parameters (e.g. --purge: "boolean")
+      if (definedParamsConfig[flagName.substring(2)]) { // --purge -> purge
+         params[flagName.substring(2)] = true; // Treat as boolean flag
+      } else if (definedParamsConfig[flagName]) { // For cases like "--full-upgrade": "boolean"
+         params[flagName] = true;
+      }
+       else {
+        // Is it a flag that expects a value? e.g. --optimize-quality <q>
+        // This simple parser doesn't handle "--flag value" well if not in syntax.
+        // Assuming flags are boolean or their values are part of the main syntax.
+        // For now, unknown flags are ignored or could be an error.
+         console.warn(`Unknown flag: ${flagName}`);
+      }
+    } else if (currentArg.startsWith("-")) {
+        // Single-dash options, potentially combined e.g. -y
+        // For simplicity, assume they are boolean flags if defined.
+        const flagChar = currentArg.substring(1);
+         if (definedParamsConfig[flagChar]) {
+            params[flagChar] = true;
+        } else {
+            console.warn(`Unknown short flag: ${flagChar}`);
+        }
+    }
+    // If not a flag, and we've processed all syntax params, it might be an error or an unhandled case.
+    // This parser is quite basic.
+  }
+  return { utility, command: commandDef, params, error };
+}
+
+function applyStateChanges(
+    utilityResult: ExtractedUtilityResult,
+    currentLiaState: LiaState
+): LiaState {
+    const { command, params, error } = utilityResult;
+    if (error || !command || !command.conceptual_impact) {
+        // If there was a parsing error or no command/impact, don't change state
+        return currentLiaState;
+    }
+
+    const newState = { ...currentLiaState };
+    const stateChanges = command.conceptual_impact.state_changes;
+
+    for (const change of stateChanges) {
+        // Check condition first
+        if (change.condition) {
+            // Conditions can be simple flags like "--purge" or parameter names.
+            // Parameter names would mean the condition is true if the param exists and is truthy.
+            // For flags like "--purge", the param key would be "purge" (after stripping --).
+            const conditionParamName = change.condition.startsWith("--") ? change.condition.substring(2) : change.condition;
+            if (!params[conditionParamName]) {
+                continue; // Condition not met
+            }
+        }
+
+        const metricValue = newState[change.metric];
+
+        // Handle multiplier for numerical values - this is a simple interpretation
+        let valueToApply = typeof change.value === 'number' ? change.value : 0;
+        if (typeof change.value === 'string' && !isNaN(parseFloat(change.value))) {
+            valueToApply = parseFloat(change.value);
+        }
+
+
+        if (change.multiplier && params[change.multiplier] && typeof params[change.multiplier] === 'number') {
+            valueToApply *= (params[change.multiplier] as number);
+        } else if (change.multiplier && params[change.multiplier] === undefined) {
+            // If multiplier is specified but param is missing, assume multiplier of 1 or skip?
+            // For now, let's assume it means the change is scaled by a count that wasn't provided, so maybe skip or default to 1.
+            // Defaulting to 1 for now if not a number.
+            // console.warn(`Multiplier ${change.multiplier} not found or not a number in params for metric ${change.metric}. Defaulting to 1x.`);
+        }
+
+
+        if (change.type === "qualitative") {
+            let currentQualitativeList: string[] = [];
+            if (Array.isArray(metricValue)) {
+                currentQualitativeList = [...metricValue];
+            } else if (typeof metricValue === 'string' && metricValue.length > 0) {
+                // Attempt to split if it's a string, assuming comma separation or similar if it was stored that way
+                // This part needs careful handling based on how qualitative lists are stored if not arrays
+                currentQualitativeList = metricValue.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            }
+
+
+            let itemToChange = change.value_template || "";
+            if (change.value_template) {
+                // Replace placeholders in value_template like %%package_name%%
+                Object.keys(params).forEach(paramKey => {
+                    const placeholder = `%%${paramKey}%%`;
+                    if (typeof params[paramKey] === 'string') {
+                        itemToChange = itemToChange.replace(new RegExp(placeholder, 'g'), params[paramKey] as string);
+                    }
+                });
+            } else if (typeof change.value === 'string') {
+                itemToChange = change.value;
+            }
+
+
+            if (change.operator === "add" && itemToChange) {
+                if (!currentQualitativeList.includes(itemToChange)) {
+                    currentQualitativeList.push(itemToChange);
+                }
+            } else if (change.operator === "remove" && itemToChange) {
+                currentQualitativeList = currentQualitativeList.filter(item => item !== itemToChange);
+            } else if (change.operator === "set" || change.operator === "=") {
+                 // For qualitative 'set', the value is likely a direct string, not a list.
+                 // Or if it's intended to set a list, change.value should be an array or parsable string.
+                newState[change.metric] = typeof change.value === 'string' ? change.value : currentQualitativeList.join(', '); // Store as string if not array type
+                continue; // Skip further processing for 'set'
+            }
+            newState[change.metric] = currentQualitativeList; // Store as array
+        } else { // Numerical change
+            let currentNumericalValue = typeof metricValue === 'number' ? metricValue : 0;
+            // If metricValue is a string, try to parse it; otherwise default to 0 or initial value.
+            if (typeof metricValue === 'string') {
+                 const parsed = parseFloat(metricValue);
+                 if (!isNaN(parsed)) currentNumericalValue = parsed;
+            }
+
+
+            if (change.operator === "+=") {
+                newState[change.metric] = currentNumericalValue + valueToApply;
+            } else if (change.operator === "-=") {
+                newState[change.metric] = currentNumericalValue - valueToApply;
+            } else if (change.operator === "=" || change.operator === "set") {
+                newState[change.metric] = valueToApply; // Use the direct value for '='
+            }
+        }
+    }
+    return newState;
+}
+
+function formatUtilityOutput(
+    utilityResult: ExtractedUtilityResult,
+    updatedLiaState: LiaState
+): { narrative: string, dmesg: string } | null {
+    const { utility, command, params, error } = utilityResult;
+
+    if (error || !command || !command.conceptual_impact) {
+        return { narrative: error || "Error: Command impact undefined.", dmesg: error || "Error: Command impact undefined." };
+    }
+
+    let narrativeOutput = command.conceptual_impact.narrative || "";
+    let dmesgOutput = command.conceptual_impact.dmesg_output || "";
+
+    // Replace %%param_name%% placeholders
+    for (const paramKey in params) {
+        const placeholder = new RegExp(`%%${paramKey}%%`, 'g');
+        // Ensure boolean params are represented as strings if needed in output
+        const paramValue = typeof params[paramKey] === 'boolean'
+            ? (params[paramKey] ? 'true' : 'false')
+            : String(params[paramKey]);
+        narrativeOutput = narrativeOutput.replace(placeholder, paramValue);
+        dmesgOutput = dmesgOutput.replace(placeholder, paramValue);
+    }
+
+    // Replace state metric placeholders like %.3f KCS or %s for strings
+    // This is a simplified approach; more robust parsing of format specifiers might be needed.
+    const metricPlaceholders = dmesgOutput.match(/%\.?\d*f [A-Z_]+|%s [A-Z_]+|%d [A-Z_]+|%[A-Z_]+/g) || [];
+    const narrativeMetricPlaceholders = narrativeOutput.match(/%\.?\d*f [A-Z_]+|%s [A-Z_]+|%d [A-Z_]+|%[A-Z_]+/g) || [];
+
+
+    [...metricPlaceholders, ...narrativeMetricPlaceholders].forEach(placeholderMatch => {
+        const parts = placeholderMatch.split(' ');
+        const formatSpecifier = parts[0]; // e.g., %.3f, %s, %d
+        const metricId = parts.length > 1 ? parts[1] : formatSpecifier.substring(1); // KCS or full metric ID
+
+        let value = updatedLiaState[metricId];
+
+        if (value === undefined) {
+            console.warn(`Metric ${metricId} not found in liaState for output formatting.`);
+            value = `UNDEFINED_${metricId}`;
+        }
+
+        let formattedValue = String(value);
+        if (typeof value === 'number') {
+            if (formatSpecifier.includes('f')) { // Float
+                const dpMatch = formatSpecifier.match(/\.(\d+)/);
+                const dp = dpMatch ? parseInt(dpMatch[1]) : 3; // Default to 3 decimal places
+                formattedValue = value.toFixed(dp);
+            } else if (formatSpecifier.includes('d')) { // Integer
+                formattedValue = String(Math.round(value));
+            }
+        } else if (Array.isArray(value)) {
+            formattedValue = value.join(', ');
+        }
+        // String values are used as is
+
+        // Replace in both narrative and dmesg
+        const regexPlaceholder = new RegExp(placeholderMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        narrativeOutput = narrativeOutput.replace(regexPlaceholder, formattedValue);
+        dmesgOutput = dmesgOutput.replace(regexPlaceholder, formattedValue);
+    });
+
+    // Replace simple %%MetricID%% placeholders (if any)
+    for (const metricKey in updatedLiaState) {
+        const placeholder = new RegExp(`%%${metricKey}%%`, 'g');
+        let value = updatedLiaState[metricKey];
+        let stringValue = "";
+        if (typeof value === 'number') {
+            stringValue = value.toFixed(3); // Default formatting for numbers
+        } else if (Array.isArray(value)) {
+            stringValue = value.join(', ');
+        } else {
+            stringValue = String(value);
+        }
+        narrativeOutput = narrativeOutput.replace(placeholder, stringValue);
+        dmesgOutput = dmesgOutput.replace(placeholder, stringValue);
+    }
+
+
+    return { narrative: narrativeOutput, dmesg: dmesgOutput };
+}
+
 
 async function loadState() {
   const savedVfs = localStorage.getItem('lia_vfs');
@@ -578,12 +890,55 @@ async function handleSendMessage(
 }
 
 async function processLiaResponse(history: ChatMessage[], thinkingBubble: HTMLElement) {
+  const userPrompt = history.length > 0 ? history[history.length - 1].parts[0].text : "";
+
+  // Attempt to process as a defined utility command first
+  const utilityExecutionResult = findUtilityAndExtractParams(userPrompt);
+
+  if (utilityExecutionResult && !utilityExecutionResult.error) {
+    console.log("Attempting to execute utility command:", utilityExecutionResult);
+    const newLiaState = applyStateChanges(utilityExecutionResult, liaState);
+    const outputMessages = formatUtilityOutput(utilityExecutionResult, newLiaState);
+
+    liaState = newLiaState; // Commit the new state
+
+    let responseText = "";
+    if (outputMessages) {
+        // Prefer dmesg for the main log, but could combine or choose.
+        // For now, let's use dmesg as the primary output, and narrative could be logged or used differently.
+        responseText = outputMessages.dmesg;
+        if (outputMessages.narrative && outputMessages.narrative !== outputMessages.dmesg) {
+            // console.log("Utility Narrative:", outputMessages.narrative); // Could log this for debugging
+        }
+    } else {
+        responseText = "Utility command executed, but no specific output was generated.";
+    }
+
+    history.pop(); // Remove user's "thinking" prompt or the original user message if we directly replace
+    history.push({ role: 'model', parts: [{ text: responseText }] });
+    thinkingBubble.replaceWith(createChatBubble('model', responseText));
+
+    if (currentActiveTabId === 'system-state-tab') {
+      renderSystemState(true); // true indicates state was updated, triggers flash
+    }
+    saveState(); // Save the updated state
+    return; // Skip AI call for successfully executed utility commands
+  } else if (utilityExecutionResult && utilityExecutionResult.error) {
+    // Handle utility parsing error - show error to user directly
+    const errorMessage = `Error processing command: ${utilityExecutionResult.error}`;
+    history.pop();
+    history.push({ role: 'model', parts: [{ text: errorMessage }] });
+    thinkingBubble.replaceWith(createChatBubble('error', errorMessage));
+    saveState();
+    return;
+  }
+
+  // If not a utility command or if parsing failed without a specific error handled above, proceed with normal AI processing
   const bootstrapFile = getFileContent(LIA_BOOTSTRAP_FILENAME);
   if (!bootstrapFile) throw new Error("LIA Bootstrap file not found for processing.");
   const bootstrap: LiaBootstrap = JSON.parse(bootstrapFile);
   let systemPromptTemplate = bootstrap.EMBEDDED_SYSTEM_PROMPTS.protocols.LIA_Kernel.prompt_template;
 
-  const userPrompt = history.length > 0 ? history[history.length - 1].parts[0].text : "";
   const operator = userPrompt.split(' ')[0] || 'init'; // Simple parsing for operator
 
   // Dynamically build the state string from all defined states in the bootstrap file
