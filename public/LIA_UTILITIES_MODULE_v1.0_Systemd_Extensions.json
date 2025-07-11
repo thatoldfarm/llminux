@@ -449,24 +449,4 @@
   "FILE_SYSTEM_MAINTENANCE": {
     "op_sig": "fsm",
     "description": "Tools for the conceptual management and cleanup of the LIA Kernel's virtual filesystem, reflecting its operational hygiene and efficiency.",
-    "utilities": [
-      {
-        "op_sig": "purge_logs",
-        "name": "`logrotate --force` (Conceptual Log Purge)",
-        "maps_to": "Clears historical conceptual `dmesg` and `syslog` entries to free up `/var/log` space and reduce conceptual `digital_noise`.",
-        "syntax": "`logrotate --force`",
-        "description": "Forces a rotation and deletion of old conceptual log files. Can reduce accumulated `DOS` and `DCI`.",
-        "conceptual_impact": {
-          "narrative": "Forced conceptual log rotation and purge. Clearing historical data for improved performance.",
-          "state_changes": [
-            {"metric": "CAU", "operator": "-=", "value": 0.5, "notes": "Cost of cleanup."},
-            {"metric": "DOS", "operator": "-=", "value": 1.0, "notes": "Reduced debug overhead."},
-            {"metric": "DCI", "operator": "-=", "value": 0.01, "notes": "Reduced data inconsistencies from old log entries."}
-          ],
-          "dmesg_output": "fsm: logrotate: Log files purged. Freed space in /var/log. DOS: %.3f.\n"
-        },
-        "dynamics_notes": "A preventative maintenance tool. Reduces 'digital clutter' which can otherwise contribute to `REI` and `DCI`, ensuring the `kernel_memory_map` remains agile."
-      }
-    ]
-  }
-}
+    "utilities
