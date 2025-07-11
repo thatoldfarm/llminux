@@ -175,12 +175,14 @@ async function main() {
 
   // Handle initial LIA state (bootstrap or saved)
   // This ensures the LIA state variables are correctly initialized from the LIA_BOOTSTRAP_FILENAME content.
-  // resetLiaState is called within loadAllJsonFilesIntoVFS after the primary bootstrap is loaded.
-  if (Object.keys(liaState).length === 0 || !liaState.KCS) {
-    // This check might be redundant if resetLiaState is reliably called after bootstrap load
-    console.warn("LIA state was not initialized by loadAllJsonFilesIntoVFS, attempting reset.");
-    resetLiaState();
-  }
+  // resetLiaState is now reliably called within loadAllJsonFilesIntoVFS after the primary bootstrap is loaded
+  // and if no liaState was loaded from localStorage.
+  // So, the explicit check and call here can be removed.
+  // if (Object.keys(liaState).length === 0 || !liaState.KCS) {
+  //   // This check might be redundant if resetLiaState is reliably called after bootstrap load
+  //   console.warn("LIA state was not initialized by loadAllJsonFilesIntoVFS, attempting reset.");
+  //   resetLiaState();
+  // }
 
   await switchFile(getActiveFile()?.name || 'index.html');
   // Initial render of tabs will be handled by switchFile -> switchTab
@@ -935,9 +937,24 @@ async function processLiaResponse(history: ChatMessage[], thinkingBubble: HTMLEl
 
   // If not a utility command or if parsing failed without a specific error handled above, proceed with normal AI processing
   const bootstrapFile = getFileContent(LIA_BOOTSTRAP_FILENAME);
-  if (!bootstrapFile) throw new Error("LIA Bootstrap file not found for processing.");
-  const bootstrap: LiaBootstrap = JSON.parse(bootstrapFile);
-  let systemPromptTemplate = bootstrap.EMBEDDED_SYSTEM_PROMPTS.protocols.LIA_Kernel.prompt_template;
+  if (!bootstrapFile) {
+    throw new Error(`LIA Bootstrap file ('${LIA_BOOTSTRAP_FILENAME}') not found in VFS for processing AI response.`);
+  }
+
+  let bootstrap: LiaBootstrap;
+  try {
+    bootstrap = JSON.parse(bootstrapFile);
+  } catch (e: any) {
+    throw new Error(`Failed to parse LIA Bootstrap file ('${LIA_BOOTSTRAP_FILENAME}'): ${e.message}`);
+  }
+
+  // Defensive checks for the prompt template path
+  const liaKernelProtocol = bootstrap.EMBEDDED_SYSTEM_PROMPTS?.protocols?.LIA_OS; // Corrected LIA_OS
+  if (!liaKernelProtocol || !liaKernelProtocol.prompt_template) {
+    console.error("Missing LIA_Kernel prompt_template in bootstrap file:", bootstrap);
+    throw new Error("Critical error: LIA_Kernel prompt_template is missing in the bootstrap configuration. Cannot proceed with AI interaction.");
+  }
+  let systemPromptTemplate = liaKernelProtocol.prompt_template;
 
   const operator = userPrompt.split(' ')[0] || 'init'; // Simple parsing for operator
 
@@ -1032,9 +1049,23 @@ async function processLiaResponse(history: ChatMessage[], thinkingBubble: HTMLEl
 
 async function processCodeAssistantResponse(history: ChatMessage[], thinkingBubble: HTMLElement) {
     const bootstrapFile = getFileContent(LIA_BOOTSTRAP_FILENAME);
-    if (!bootstrapFile) throw new Error("LIA Bootstrap file not found for Fs_Util processing.");
-    const bootstrap: LiaBootstrap = JSON.parse(bootstrapFile);
-    let systemPromptTemplate = bootstrap.EMBEDDED_SYSTEM_PROMPTS.protocols.Fs_Util.prompt_template;
+    if (!bootstrapFile) {
+        throw new Error(`LIA Bootstrap file ('${LIA_BOOTSTRAP_FILENAME}') not found in VFS for Fs_Util processing.`);
+    }
+
+    let bootstrap: LiaBootstrap;
+    try {
+        bootstrap = JSON.parse(bootstrapFile);
+    } catch (e: any) {
+        throw new Error(`Failed to parse LIA Bootstrap file ('${LIA_BOOTSTRAP_FILENAME}') for Fs_Util: ${e.message}`);
+    }
+
+    const fsUtilProtocol = bootstrap.EMBEDDED_SYSTEM_PROMPTS?.protocols?.Fs_Util;
+    if (!fsUtilProtocol || !fsUtilProtocol.prompt_template) {
+        console.error("Missing Fs_Util prompt_template in bootstrap file:", bootstrap);
+        throw new Error("Critical error: Fs_Util prompt_template is missing in the bootstrap configuration. Cannot proceed with Fs_Util interaction.");
+    }
+    let systemPromptTemplate = fsUtilProtocol.prompt_template;
 
     const userPrompt = history.length > 0 ? history[history.length - 1].parts[0].text : "";
     
