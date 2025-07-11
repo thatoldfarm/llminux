@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIA Studio: LLM Hidden States Explorer</title>
+    <link rel="stylesheet" href="index.css">
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="app">
+        <header id="header-toolbar">
+            <div class="toolbar-group">
+                <button id="toggle-sidebar" class="toolbar-button" title="Toggle File Explorer">☰</button>
+                <span id="app-name">LIA Studio</span>
+            </div>
+            <div class="toolbar-group">
+                <button class="toolbar-button icon-save" title="Save"></button>
+                <button class="toolbar-button icon-deploy" title="Deploy"></button>
+                <button class="toolbar-button icon-download" title="Download"></button>
+                <button class="toolbar-button icon-share" title="Share"></button>
+                <button id="toggle-right-sidebar" class="toolbar-button" title="Toggle AI Settings">⚙️</button>
+            </div>
+        </header>
+
+        <div id="main-content">
+            <aside id="left-sidebar">
+                <div class="sidebar-header">
+                    <span>FILES</span>
+                    <button id="collapse-sidebar-button" class="sidebar-collapse-button" title="Collapse Sidebar">«</button>
+                </div>
+                <div id="file-tree">
+                    <!-- File items will be injected here by JS -->
+                </div>
+            </aside>
+
+            <main id="workspace">
+                <nav id="tab-nav">
+                    <button class="tab-button active" data-tab-id="code-editor-tab">Code Editor</button>
+                    <button class="tab-button" data-tab-id="ai-assistant-tab">LIA Assistant</button>
+                    <button class="tab-button" data-tab-id="code-assistant-tab">Code Assistant</button>
+                    <button class="tab-button" data-tab-id="system-state-tab">System State</button>
+                </nav>
+                <div id="tab-content">
+                    <div id="code-editor-tab" class="tab-pane active">
+                        <textarea id="code-editor" spellcheck="false"></textarea>
+                    </div>
+                    <div id="ai-assistant-tab" class="tab-pane">
+                        <div class="chat-messages" id="chat-messages">
+                            <!-- Chat messages will be injected here by JS -->
+                        </div>
+                        <div class="chat-input-container">
+                            <textarea id="chat-input" placeholder="Ask LIA a question..." rows="1"></textarea>
+                            <button id="send-chat-button">Send</button>
+                        </div>
+                    </div>
+                     <div id="code-assistant-tab" class="tab-pane">
+                        <div class="chat-messages" id="code-chat-messages">
+                            <!-- Code assistant messages will be injected here by JS -->
+                        </div>
+                        <div class="chat-input-container">
+                            <textarea id="code-chat-input" placeholder="Ask the code assistant..." rows="1"></textarea>
+                            <button id="send-code-chat-button">Send</button>
+                        </div>
+                    </div>
+                    <div id="system-state-tab" class="tab-pane">
+                        <!-- System State metrics will be injected here by JS -->
+                    </div>
+                </div>
+            </main>
+
+            <aside id="right-sidebar">
+                <div class="sidebar-header">AI Model Settings</div>
+                <div class="settings-pane">
+                    <!-- Model Selector -->
+                    <div class="settings-item">
+                        <span class="item-label">Model</span>
+                        <div class="custom-select-container">
+                            <select id="ai-model-select" class="custom-select">
+                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                <option value="gemini-2.5-pro">Gemini 2.5 Pro (mock)</option>
+                                <option value="gemini-1.0-pro">Gemini 1.0 Pro (mock)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Temperature Slider -->
+                    <div class="settings-item">
+                        <span class="item-label">Temperature</span>
+                        <div class="custom-slider-container">
+                            <input type="range" id="temperature-slider" min="0" max="2" step="0.05" value="1.0">
+                            <input type="number" id="temperature-input" min="0" max="2" step="0.05" value="1.0">
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Advanced Settings Group -->
+                    <div class="settings-group-header" data-group="advanced-group">
+                        <span class="toggle-icon">▼</span>
+                        <h3>Advanced settings</h3>
+                    </div>
+                    <div class="settings-group-content" id="advanced-group-content">
+                        <div class="settings-item">
+                            <span class="item-label">Max output tokens</span>
+                            <div class="custom-slider-container">
+                                <input type="range" id="max-output-tokens-slider" min="10" max="8192" step="1" value="2048">
+                                <input type="number" id="max-output-tokens-input" min="10" max="8192" step="1" value="2048">
+                            </div>
+                        </div>
+                        <div class="settings-item">
+                            <span class="item-label">Top P</span>
+                            <div class="custom-slider-container">
+                                <input type="range" id="top-p-slider" min="0" max="1" step="0.01" value="0.95">
+                                <input type="number" id="top-p-input" min="0" max="1" step="0.01" value="0.95">
+                            </div>
+                        </div>
+                        <div class="settings-item">
+                            <span class="item-label">Top K</span>
+                            <div class="custom-slider-container">
+                                <input type="range" id="top-k-slider" min="1" max="40" step="1" value="40">
+                                <input type="number" id="top-k-input" min="1" max="40" step="1" value="40">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+    <script type="module" src="index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

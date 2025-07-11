@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Dev Studio</title>
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.sh/@google/genai@^1.8.0"
+      }
+    }
+    </script>
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+
+        let ai;
+        // This promise will resolve when the API key is received from the parent window.
+        window.getAiInstance = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error("API Key not received from host application within 5 seconds."));
+            }, 5000);
+
+            window.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'API_KEY' && event.data.apiKey) {
+                    clearTimeout(timeout);
+                    console.log('IDE: API Key received from host.');
+                    try {
+                        ai = new GoogleGenAI({ apiKey: event.data.apiKey });
+                        resolve(ai);
+                    } catch (error) {
+                        console.error("IDE: Failed to initialize GoogleGenAI", error);
+                        reject(error);
+                    }
+                }
+            }, { once: true });
+        });
+    </script>
+    <style>
+        /* CSS Reset & Variables */
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #333333;
+            --text-primary: #cccccc;
+            --text-secondary: #aaaaaa;
+            --border-color: #3f3f3f;
+            --accent-color: #007acc;
+            --accent-hover: #005f99;
+            --active-tab-bg: #2d2d2d;
+            --scrollbar-thumb: #555;
+            --scrollbar-track: #2f2f2f;
+            --input-bg: #2d2d2d;
+            --input-border: #444;
+            --input-text: #e0e0e0;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Prevent body scroll */
+            font-size: 14px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: var(--scrollbar-thumb);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background-color: var(--scrollbar-track);
+        }
+
+        /* Header Toolbar */
+        #header-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            min-height: 50px;
+            gap: 15px;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+        }
+
+        .header-left, .header-center, .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .app-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: var(--accent-color);
+        }
+
+        .session-title {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            margin-left: 5px;
+        }
+
+        button {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            white-space: nowrap; /* Prevent wrapping */
+        }
+
+        button:hover {
+            background-color: #4a4a4a;
+            border-color: #666;
+        }
+        
+        button:active {
+            background-color: #3a3a3a;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .header-action-btn, .header-toggle-btn {
+            min-width: 40px; /* Ensure consistent icon button size */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 5px 10px; /* Adjust padding for icon-like buttons */
+        }
+
+        .header-toggle-btn.active {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+        }
+        .header-toggle-btn.active:hover {
+             background-color: var(--accent-hover);
+             border-color: var(--accent-hover);
+        }
+
+        #sidebar-toggle { font-size: 1.2em; padding: 5px 10px; min-width: 30px; }
+        #right-sidebar-toggle { font-size: 1.2em; padding: 5px 10px; min-width: 30px; }
+
+
+        /* Main Container */
+        #main-container {
+            display: flex;
+            flex: 1; /* Allows main content to fill remaining vertical space */
+            overflow: hidden; /* Important for child scrolling */
+        }
+
+        /* Sidebars Common */
+        .sidebar {
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+            overflow-x: hidden; /* Hide horizontal scrollbar when collapsed */
+            flex-shrink: 0; /* Prevent sidebar from shrinking */
+        }
+
+        .sidebar.collapsed {
+            width: 0 !important; /* Fully collapse */
+            min-width: 0 !important; /* No minimum width */
+            border: none !important; /* Remove borders when collapsed */
+        }
+        
+        .sidebar.collapsed .sidebar-header,
+        .sidebar.collapsed .file-item span,
+        .sidebar.collapsed .file-item .file-icon,
+        .sidebar.collapsed .settings-item > *:not(.custom-toggle), /* Hide everything except toggle switch body */
+        .sidebar.collapsed .settings-item .custom-toggle input ~ span + .slider, /* Hide toggle button too */
+        .sidebar.collapsed .settings-pane button {
+            opacity: 0; /* Hide content */
+            transition: opacity 0.1s ease; /* Quick fade out */
+            pointer-events: none; /* Disable interaction */
+            white-space: nowrap; /* Keep content from wrapping */
+            transform: translateX(-100%); /* Slide elements out */
+        }
+
+        .sidebar.collapsed .settings-item .custom-toggle input + .slider {
+            opacity: 0; /* Ensures the toggle itself disappears */
+        }
+        .sidebar.collapsed .settings-item .custom-toggle {
+            width: 0; /* Collapse the toggle container completely */
+        }
+
+
+        #sidebar {
+            width: 250px;
+            min-width: 50px; /* For hover state, maybe not strictly needed with 0 width collapse */
+            border-right: 1px solid var(--border-color);
+        }
+
+        #right-sidebar {
+            width: 300px;
+            min-width: 50px; /* For hover state */
+            border-left: 1px solid var(--border-color);
+        }
+
+        .sidebar-header {
+            padding: 10px 15px;
+            font-weight: bold;
+            font-size: 0.95em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        #file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex: 1; /* Allow file list to grow */
+            overflow-y: auto; /* Enable vertical scrolling */
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-item:hover {
+            background-color: #3a3a3a;
+        }
+
+        .file-item.active {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .file-item.active:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .file-item .file-icon {
+            margin-right: 8px;
+            font-size: 1.1em;
+            flex-shrink: 0;
+        }
+
+        /* Right Sidebar Specifics */
+        .settings-pane {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .settings-pane hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 15px 0;
+        }
+
+        .settings-group-header {
+            display: flex;
+            align-items: center;
+            height: 40px;
+            padding: 0 5px;
+            font-weight: bold;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            gap: 8px;
+        }
+        .settings-group-header:hover {
+            background-color: #3a3a3a;
+        }
+        .settings-group-header h3 {
+            margin: 0;
+            flex-grow: 1;
+        }
+        .settings-group-header .toggle-icon {
+            font-size: 1.2em;
+            transition: transform 0.2s ease;
+        }
+        .settings-group-header.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+        .settings-group-content {
+            display: none;
+            padding-left: 5px; /* Indent sub-settings */
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+        }
+        .settings-group-content.expanded {
+            display: block; /* Use block to occupy space */
+            max-height: 500px; /* A large enough value to allow content to show */
+            opacity: 1;
+        }
+
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 5px;
+            gap: 10px;
+        }
+
+        .settings-item .item-label {
+            flex-grow: 1;
+            color: var(--text-secondary);
+            font-size: 0.95em;
+        }
+
+        /* Custom Select */
+        .custom-select-container {
+            position: relative;
+            width: 100%;
+        }
+        .custom-select {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: var(--input-bg);
+            color: var(--input-text);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            appearance: none; /* Remove default arrow */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            line-height: 1.5;
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+        }
+        .custom-select:hover {
+            border-color: var(--accent-color);
+        }
+        .custom-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3);
+        }
+        .custom-select-container::after {
+            content: '▼'; /* Custom arrow */
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        /* Custom Slider */
+        .custom-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            position: relative;
+        }
+
+        .custom-slider-container input[type="range"] {
+            -webkit-appearance: none; /* Override default appearance */
+            width: 100%;
+            height: 5px;
+            background: var(--bg-tertiary);
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+            border-radius: 3px;
+        }
+
+        .custom-slider-container input[type="range"]:hover {
+            opacity: 1;
+        }
+
+        .custom-slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: var(--accent-color);
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .custom-slider-container input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            background: var(--accent-color);
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .custom-slider-container input[type="number"] {
+            width: 50px;
+            padding: 5px;
+            background-color: var(--input-bg);
+            color: var(--input-text);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        /* Custom Toggle Switch */
+        /* Inspired by https://www.w3schools.com/howto/howto_css_switch.asp */
+        .custom-toggle {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 24px;
+            min-width: 40px; /* Ensure it doesn't shrink */
+        }
+        .custom-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .custom-toggle .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            transition: .4s;
+            border-radius: 24px;
+            border: 1px solid var(--border-color); /* Add a border for depth */
+        }
+        .custom-toggle .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px; /* Adjusted from 4px to accommodate border */
+            bottom: 3px; /* Adjusted from 4px to accommodate border */
+            background-color: var(--text-primary);
+            transition: .4s;
+            border-radius: 50%;
+        }
+        .custom-toggle input:checked + .slider {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+        .custom-toggle input:checked + .slider:before {
+            transform: translateX(16px); /* 40px width - 3px padding * 2 - 16px button width */
+            background-color: white; /* Make the knob white when active */
+        }
+
+        .settings-item .edit-btn {
+            font-size: 0.8em;
+            padding: 4px 8px;
+            min-width: unset;
+        }
+
+        .token-count {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            padding-left: 5px;
+        }
+
+        /* Main Workspace */
+        #workspace {
+            flex: 1; /* Takes remaining space */
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-primary);
+            overflow: hidden; /* Prevents overflow from tab panels */
+        }
+
+        #tab-bar {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--bg-secondary);
+            flex-shrink: 0; /* Prevent tab bar from shrinking */
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s ease, border-bottom-color 0.2s ease, background-color 0.2s ease;
+            outline: none; /* Remove outline on focus */
+        }
+
+        .tab-button:hover {
+            color: var(--text-primary);
+            background-color: #3b3b3b;
+        }
+
+        .tab-button.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--accent-color);
+            background-color: var(--active-tab-bg);
+        }
+
+        #tab-content {
+            flex: 1;
+            position: relative; /* For absolute positioning of panels */
+            overflow: hidden; /* Ensures child panels don't overflow */
+        }
+
+        .tab-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none; /* Hidden by default */
+            transition: opacity 0.3s ease;
+            overflow: hidden; /* Ensure content within panel respects boundaries */
+        }
+
+        .tab-panel.active {
+            display: flex; /* Or block, depending on inner layout */
+            opacity: 1;
+        }
+
+        /* Code Editor */
+        #code-editor-panel {
+            flex-direction: column; /* Allows textarea to take full height */
+        }
+
+        #code-editor {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: none;
+            padding: 15px;
+            font-family: 'Fira Code', 'Cascadia Code', 'Source Code Pro', monospace;
+            font-size: 0.95em;
+            resize: none;
+            outline: none;
+            line-height: 1.5;
+            white-space: pre; /* Essential for code layout */
+            overflow: auto; /* Enable scrolling for large code */
+        }
+
+        /* AI Assistant */
+        #ai-assistant-panel {
+            flex-direction: column; /* Chat history and input */
+            background-color: var(--bg-primary);
+        }
+
+        #chat-history {
+            flex: 1; /* Allows history to grow */
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-bubble {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            font-size: 0.9em;
+        }
+
+        .chat-bubble.user {
+            background-color: var(--accent-color);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-bubble.ai {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .chat-bubble.ai.thinking {
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        #chat-input-area {
+            display: flex;
+            padding: 10px 15px;
+            border-top: 1px solid var(--border-color) !important;
+            background-color: var(--bg-secondary);
+            gap: 10px;
+            flex-shrink: 0; /* Prevent input area from shrinking */
+        }
+
+        #chat-textarea {
+            flex: 1;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 0.9em;
+            resize: none; /* Disable manual resize */
+            min-height: 40px;
+            line-height: 1.5;
+            max-height: 150px; /* Limit height so it doesn't get too big */
+            overflow-y: auto;
+        }
+
+        #send-chat-btn {
+            align-self: flex-end; /* Align to bottom of textarea */
+            padding: 8px 15px;
+        }
+
+        /* Live Preview */
+        #live-preview-panel {
+            flex-direction: column; /* Toolbar and iframe */
+            background-color: #fff; /* Ensure iframe background is visible */
+        }
+
+        .preview-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            color: var(--text-primary);
+            font-weight: bold;
+            font-size: 0.95em;
+        }
+        
+        .preview-toolbar button {
+            padding: 5px 15px;
+            font-size: 0.85em;
+            border-color: var(--input-border);
+        }
+        .preview-toolbar button:hover {
+            background-color: #4a4a4a;
+        }
+
+        #live-preview-iframe {
+            width: 100%;
+            flex: 1; /* Takes remaining space */
+            border: none;
+            background-color: #ffffff;
+            color: #333333; /* Default text color within iframe */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #header-toolbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .header-center, .header-right {
+                flex-basis: 100%;
+                justify-content: space-around;
+                margin-top: 5px;
+            }
+            #sidebar, #right-sidebar {
+                width: 0; /* Always collapsed on small screens initially */
+            }
+            .sidebar.collapsed { /* Override for small screens */
+                width: 0 !important;
+                min-width: 0 !important;
+                border: none !important;
+            }
+            /* Override to hide content on small screens by default */
+            #sidebar.collapsed .sidebar-header, #sidebar.collapsed .file-item,
+            #right-sidebar.collapsed .sidebar-header, #right-sidebar.collapsed .settings-item,
+            #right-sidebar.collapsed .settings-group-header {
+                opacity: 0;
+            }
+            #main-container {
+                flex-direction: column; /* Stack main content vertically */
+            }
+            #workspace {
+                width: 100%;
+            }
+            #sidebar, #right-sidebar {
+                 position: absolute; /* Take out of flow */
+                 height: calc(100% - 50px); /* Adjust height */
+                 z-index: 100; /* Bring to front */
+                 top: 50px; /* Below header */
+            }
+            #sidebar { left: 0; }
+            #right-sidebar { right: 0; }
+            #sidebar:not(.collapsed) { width: 250px; }
+            #right-sidebar:not(.collapsed) { width: 250px; }
+        }
+    </style>
+</head>
+<body>
+    <header id="header-toolbar">
+        <div class="header-left">
+            <button id="sidebar-toggle" title="Toggle Left Sidebar">☰</button>
+            <span class="app-name">AI Dev Studio</span>
+            <span class="session-title">Untitled Session</span>
+        </div>
+        <div class="header-center">
+            <button class="header-action-btn" id="save-btn" title="Save">💾</button>
+            <button class="header-action-btn" id="deploy-btn" title="Deploy">🚀</button>
+            <button class="header-action-btn" id="download-btn" title="Download">⬇️</button>
+            <button class="header-action-btn" id="share-btn" title="Share">↗️</button>
+        </div>
+        <div class="header-right">
+            <button class="header-toggle-btn active" data-target="code-editor-panel" title="Code Editor">Code</button>
+            <button class="header-toggle-btn" data-target="ai-assistant-panel" title="AI">AI</button>
+            <button class="header-toggle-btn" data-target="live-preview-panel" title="Live Preview">Preview</button>
+            <button id="right-sidebar-toggle" title="Toggle AI Settings">⚙️</button>
+        </div>
+    </header>
+
+    <main id="main-container">
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">File Explorer</div>
+            <ul id="file-list">
+                <li class="file-item active" data-file-key="index.html"><span class="file-icon">📄</span> index.html</li>
+                <li class="file-item" data-file-key="main.js"><span class="file-icon">📄</span> main.js</li>
+                <li class="file-item" data-file-key="style.css"><span class="file-icon">📄</span> style.css</li>
+                <li class="file-item" data-file-key="config.json"><span class="file-icon">📄</span> config.json</li>
+            </ul>
+        </aside>
+
+        <section id="workspace">
+            <div id="tab-bar">
+                <button class="tab-button active" data-target-panel="code-editor-panel">Code Editor</button>
+                <button class="tab-button" data-target-panel="ai-assistant-panel">AI Assistant</button>
+                <button class="tab-button" data-target-panel="live-preview-panel">Live Preview</button>
+            </div>
+            <div id="tab-content">
+                <div id="code-editor-panel" class="tab-panel active">
+                    <textarea id="code-editor" spellcheck="false" wrap="off"></textarea>
+                </div>
+                <div id="ai-assistant-panel" class="tab-panel">
+                    <div id="chat-history"></div>
+                    <div id="chat-input-area">
+                        <textarea id="chat-textarea" placeholder="Ask AI Assistant..." rows="1"></textarea>
+                        <button id="send-chat-btn">Send</button>
+                    </div>
+                </div>
+                <div id="live-preview-panel" class="tab-panel">
+                    <div class="preview-toolbar">
+                        <span>Live Preview</span>
+                        <button id="run-preview-btn">Run</button>
+                    </div>
+                    <iframe id="live-preview-iframe" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"></iframe>
+                </div>
+            </div>
+        </section>
+
+        <aside id="right-sidebar" class="sidebar">
+            <div class="sidebar-header">AI Model Settings</div>
+            <div class="settings-pane">
+                <!-- Model Selector -->
+                <div class="settings-item">
+                    <span class="item-label">Model</span>
+                    <div class="custom-select-container">
+                        <select id="ai-model-select" class="custom-select">
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                            <option value="gemini-1.0-pro">Gemini 1.0 Pro</option>
+                            <option value="llama-3">Llama 3</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Token Count -->
+                <div class="settings-item">
+                    <span class="item-label">Token count</span>
+                    <span id="token-count-display" class="token-count">0 / 1,048,576</span>
+                </div>
+
+                <!-- Temperature Slider -->
+                <div class="settings-item">
+                    <span class="item-label">Temperature</span>
+                    <div class="custom-slider-container">
+                        <input type="range" id="temperature-slider" min="0" max="2" step="0.05" value="1.0">
+                        <input type="number" id="temperature-input" min="0" max="2" step="0.05" value="1.0">
+                    </div>
+                </div>
+
+                <!-- Media Resolution Selector -->
+                <div class="settings-item">
+                    <span class="item-label">Media Resolution</span>
+                    <div class="custom-select-container">
+                        <select id="media-resolution-select" class="custom-select">
+                            <option value="default">Default</option>
+                            <option value="high">High</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Thinking Group -->
+                <div class="settings-group-header" data-group="thinking-group">
+                    <h3>Thinking</h3>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="settings-group-content" id="thinking-group-content">
+                    <div class="settings-item">
+                        <span class="item-label">Thinking mode</span>
+                        <label class="custom-toggle">
+                            <input type="checkbox" id="thinking-mode-toggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item">
+                        <span class="item-label">Set thinking budget</span>
+                        <label class="custom-toggle">
+                            <input type="checkbox" id="thinking-budget-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <!-- More thinking budget options could go here, toggled by the above checkbox -->
+                </div>
+
+                <hr>
+
+                <!-- Tools Group -->
+                <div class="settings-group-header" data-group="tools-group">
+                    <h3>Tools</h3>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="settings-group-content" id="tools-group-content">
+                    <div class="settings-item">
+                        <span class="item-label">Structured output</span>
+                        <label class="custom-toggle">
+                            <input type="checkbox" id="structured-output-toggle">
+                            <span class="slider"></span>
+                        </label>
+                        <button class="edit-btn" disabled>Edit</button>
+                    </div>
+                    <div class="settings-item">
+                        <span class="item-label">Code execution</span>
+                        <label class="custom-toggle">
+                            <input type="checkbox" id="code-execution-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item">
+                        <span class="item-label">Function calling</span>
+                        <label class="custom-toggle">
+                            <input type="checkbox" id="function-calling-toggle">
+                            <span class="slider"></span>
+                        </label>
+                        <button class="edit-btn" disabled>Edit</button>
+                    </div>
+                    <div class="settings-item">
+                        <span class="item-label">Grounding with Google Search</span>
+                        <label class="custom-toggle">
+                            <input type="checkbox" id="google-search-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item">
+                        <span class="item-label">URL context</span>
+                        <label class="custom-toggle">
+                            <input type="checkbox" id="url-context-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Advanced Settings Group -->
+                <div class="settings-group-header" data-group="advanced-group">
+                    <h3>Advanced settings</h3>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="settings-group-content" id="advanced-group-content">
+                    <div class="settings-item">
+                        <span class="item-label">Max output tokens</span>
+                        <div class="custom-slider-container">
+                            <input type="range" id="max-output-tokens-slider" min="10" max="2048" step="1" value="1024">
+                            <input type="number" id="max-output-tokens-input" min="10" max="2048" step="1" value="1024">
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <span class="item-label">Top P</span>
+                        <div class="custom-slider-container">
+                            <input type="range" id="top-p-slider" min="0" max="1" step="0.01" value="0.95">
+                            <input type="number" id="top-p-input" min="0" max="1" step="0.01" value="0.95">
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <span class="item-label">Top K</span>
+                        <div class="custom-slider-container">
+                            <input type="range" id="top-k-slider" min="1" max="40" step="1" value="40">
+                            <input type="number" id="top-k-input" min="1" max="40" step="1" value="40">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const rightSidebar = document.getElementById('right-sidebar');
+            const rightSidebarToggle = document.getElementById('right-sidebar-toggle');
+            const codeEditor = document.getElementById('code-editor');
+            const chatHistoryDiv = document.getElementById('chat-history');
+            const chatTextarea = document.getElementById('chat-textarea');
+            const sendChatBtn = document.getElementById('send-chat-btn');
+            const livePreviewIframe = document.getElementById('live-preview-iframe');
+            const runPreviewBtn = document.getElementById('run-preview-btn');
+
+            const tabButtons = document.querySelectorAll('#tab-bar .tab-button');
+            const tabPanels = document.querySelectorAll('#tab-content .tab-panel');
+            const headerToggleButtons = document.querySelectorAll('.header-toggle-btn');
+            const fileItems = document.querySelectorAll('.file-item');
+
+            let currentActivePanelId = 'code-editor-panel'; // Tracks which panel is currently active
+
+            // --- Persistence Data ---
+            const DEFAULT_FILE_CONTENTS = {
+                'index.html': `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Simple App</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            background-color: #f0f0f0; 
+            color: #333; 
+            overflow: hidden;
+        }
+        h1 { color: #0056b3; }
+        button { 
+            padding: 10px 20px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+        }
+        button:hover { background-color: #0056b3; }
+        #message { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to your AI App!</h1>
+    <button id="myButton">Click Me</button>
+    <p id="message"></p>
+
+    <script>
+        // Inline JavaScript for the preview
+        const myButton = document.getElementById('myButton');
+        const messageDisplay = document.getElementById('message');
+        let clickCount = 0;
+
+        if (myButton && messageDisplay) { // Basic check for elements
+            myButton.addEventListener('click', () => {
+                clickCount++;
+                messageDisplay.textContent = \`Button clicked \${clickCount} time(s)!\`;
+                if (clickCount === 3) {
+                    alert('You clicked it 3 times!');
+                }
+            });
+        } else {
+            console.warn('Preview elements not found.');
+        }
+    <\/script>
+</body>
+</html>`,
+                'main.js': `// Your main JavaScript logic
+console.log('Hello from main.js!');
+
+function greet(name) {
+    return \`Hello, \${name}!\`;
+}
+
+console.log(greet('Developer'));
+
+// Add more JavaScript here...`,
+                'style.css': `/* Your main CSS styles */
+body {
+    font-family: 'Roboto', sans-serif;
+    line-height: 1.6;
+    margin: 20px;
+    background-color: #e9ecef;
+    color: #343a40;
+}
+
+h1 {
+    color: #0056b3;
+}
+
+button {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #218838;
+}`,
+                'config.json': `{
+    "projectName": "My Dev Studio Project",
+    "version": "1.0.0",
+    "settings": {
+        "autoSave": true,
+        "theme": "dark",
+        "fontSize": 14
+    },
+    "dependencies": [
+        "moduleA",
+        "moduleB"
+    ]
+}`
+            };
+
+            let fileContents = JSON.parse(localStorage.getItem('devStudioCode')) || DEFAULT_FILE_CONTENTS;
+            let currentOpenFile = localStorage.getItem('devStudioCurrentFile') || 'index.html';
+            let chatHistory = JSON.parse(localStorage.getItem('devStudioChat')) || [];
+            let isSidebarCollapsed = localStorage.getItem('devStudioSidebarCollapsed') === 'true';
+            let isRightSidebarCollapsed = localStorage.getItem('devStudioRightSidebarCollapsed') === 'true';
+
+            // AI Settings references
+            const aiSettings = {
+                model: document.getElementById('ai-model-select'),
+                temperature: document.getElementById('temperature-slider'),
+                temperatureInput: document.getElementById('temperature-input'),
+                tokenCount: document.getElementById('token-count-display'),
+                mediaResolution: document.getElementById('media-resolution-select'),
+                thinkingModeToggle: document.getElementById('thinking-mode-toggle'),
+                thinkingBudgetToggle: document.getElementById('thinking-budget-toggle'),
+                structuredOutputToggle: document.getElementById('structured-output-toggle'),
+                codeExecutionToggle: document.getElementById('code-execution-toggle'),
+                functionCallingToggle: document.getElementById('function-calling-toggle'),
+                googleSearchToggle: document.getElementById('google-search-toggle'),
+                urlContextToggle: document.getElementById('url-context-toggle'),
+                maxOutputTokensSlider: document.getElementById('max-output-tokens-slider'),
+                maxOutputTokensInput: document.getElementById('max-output-tokens-input'),
+                topPSlider: document.getElementById('top-p-slider'),
+                topPInput: document.getElementById('top-p-input'),
+                topKSlider: document.getElementById('top-k-slider'),
+                topKInput: document.getElementById('top-k-input'),
+            };
+
+            const defaultAiSettings = {
+                model: 'gemini-2.5-pro',
+                temperature: 1.0,
+                mediaResolution: 'default',
+                thinkingMode: true,
+                thinkingBudget: false,
+                structuredOutput: false,
+                codeExecution: false,
+                functionCalling: false,
+                googleSearch: false,
+                urlContext: false,
+                maxOutputTokens: 1024,
+                topP: 0.95,
+                topK: 40,
+                expandedGroups: { // Persist expanded state of groups
+                    'thinking-group': false,
+                    'tools-group': false,
+                    'advanced-group': false,
+                }
+            };
+
+            // --- Initialization ---
+
+            // Load saved code for the active file
+            codeEditor.value = fileContents[currentOpenFile] || DEFAULT_FILE_CONTENTS[currentOpenFile];
+            
+            // Set initial active file in sidebar
+            fileItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.fileKey === currentOpenFile) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Restore sidebar states
+            if (isSidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+            }
+            if (isRightSidebarCollapsed) {
+                rightSidebar.classList.add('collapsed');
+            }
+
+            // Restore AI Settings
+            function loadAiSettings() {
+                const savedSettings = JSON.parse(localStorage.getItem('devStudioAiSettings')) || {};
+                const settings = { ...defaultAiSettings, ...savedSettings };
+
+                aiSettings.model.value = settings.model;
+                
+                aiSettings.temperature.value = settings.temperature;
+                aiSettings.temperatureInput.value = settings.temperature;
+
+                aiSettings.mediaResolution.value = settings.mediaResolution;
+                
+                aiSettings.thinkingModeToggle.checked = settings.thinkingMode;
+                aiSettings.thinkingBudgetToggle.checked = settings.thinkingBudget;
+                aiSettings.structuredOutputToggle.checked = settings.structuredOutput;
+                aiSettings.codeExecutionToggle.checked = settings.codeExecution;
+                aiSettings.functionCallingToggle.checked = settings.functionCalling;
+                aiSettings.googleSearchToggle.checked = settings.googleSearch;
+                aiSettings.urlContextToggle.checked = settings.urlContext;
+
+                aiSettings.maxOutputTokensSlider.value = settings.maxOutputTokens;
+                aiSettings.maxOutputTokensInput.value = settings.maxOutputTokens;
+                aiSettings.topPSlider.value = settings.topP;
+                aiSettings.topPInput.value = settings.topP;
+                aiSettings.topKSlider.value = settings.topK;
+                aiSettings.topKInput.value = settings.topK;
+
+                // Restore expanded group states
+                document.querySelectorAll('.settings-group-header').forEach(header => {
+                    const groupId = header.dataset.group;
+                    const content = document.getElementById(`${groupId}-content`);
+                    if (settings.expandedGroups[groupId]) {
+                        header.classList.add('expanded');
+                        content.classList.add('expanded');
+                    } else {
+                        header.classList.remove('expanded');
+                        content.classList.remove('expanded');
+                    }
+                });
+
+                // Callbacks for dynamic updates (e.g. token count could update based on model selection)
+                updateTokenCount();
+            }
+
+            // Save AI Settings
+            function saveAiSettings() {
+                const settings = {
+                    model: aiSettings.model.value,
+                    temperature: parseFloat(aiSettings.temperature.value),
+                    mediaResolution: aiSettings.mediaResolution.value,
+                    thinkingMode: aiSettings.thinkingModeToggle.checked,
+                    thinkingBudget: aiSettings.thinkingBudgetToggle.checked,
+                    structuredOutput: aiSettings.structuredOutputToggle.checked,
+                    codeExecution: aiSettings.codeExecutionToggle.checked,
+                    functionCalling: aiSettings.functionCallingToggle.checked,
+                    googleSearch: aiSettings.googleSearchToggle.checked,
+                    urlContext: aiSettings.urlContextToggle.checked,
+                    maxOutputTokens: parseInt(aiSettings.maxOutputTokensSlider.value),
+                    topP: parseFloat(aiSettings.topPSlider.value),
+                    topK: parseInt(aiSettings.topKSlider.value),
+                    expandedGroups: {}
+                };
+                document.querySelectorAll('.settings-group-header').forEach(header => {
+                    settings.expandedGroups[header.dataset.group] = header.classList.contains('expanded');
+                });
+                localStorage.setItem('devStudioAiSettings', JSON.stringify(settings));
+            }
+
+            // Render chat history
+            renderChatHistory();
+
+            // Auto-size chat textarea
+            adjustChatTextareaHeight();
+
+            // Initial load of AI settings
+            loadAiSettings();
+
+            // --- Functions ---
+            function switchPanel(panelId) {
+                const currentHeaderToggle = document.querySelector(`.header-toggle-btn.active`);
+                if (currentHeaderToggle) currentHeaderToggle.classList.remove('active');
+                const currentTab = document.querySelector(`#tab-bar .tab-button.active`);
+                if (currentTab) currentTab.classList.remove('active');
+                const currentPanel = document.querySelector(`#tab-content .tab-panel.active`);
+                if (currentPanel) currentPanel.classList.remove('active');
+
+                document.querySelector(`.header-toggle-btn[data-target="${panelId}"]`)?.classList.add('active');
+                document.querySelector(`#tab-bar .tab-button[data-target-panel="${panelId}"]`)?.classList.add('active');
+                const newPanel = document.getElementById(panelId);
+                if (newPanel) newPanel.classList.add('active');
+
+                currentActivePanelId = panelId;
+                if (panelId === 'live-preview-panel') updateLivePreview();
+            }
+
+            function updateLivePreview() {
+                const code = fileContents['index.html'];
+                const js = fileContents['main.js'];
+                const css = fileContents['style.css'];
+
+                livePreviewIframe.srcdoc = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>${css}</style>
+                    </head>
+                    <body>
+                        ${code.substring(code.indexOf('<body>') + 6, code.lastIndexOf('</body>'))}
+                        <script>${js}<\/script>
+                    </body>
+                    </html>`;
+            }
+
+            function saveCodeToLocalStorage() {
+                fileContents[currentOpenFile] = codeEditor.value;
+                localStorage.setItem('devStudioCode', JSON.stringify(fileContents));
+            }
+            
+            function addBubble(type, text) {
+                const bubble = document.createElement('div');
+                bubble.classList.add('chat-bubble', type);
+                bubble.textContent = text;
+                chatHistoryDiv.appendChild(bubble);
+                return bubble;
+            }
+
+            function renderChatHistory() {
+                chatHistoryDiv.innerHTML = '';
+                chatHistory.forEach(msg => addBubble(msg.type, msg.text));
+                chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+            }
+
+            async function sendChatMessage() {
+                const text = chatTextarea.value.trim();
+                if (text === '') return;
+
+                chatHistory.push({ type: 'user', text });
+                const thinkingBubble = addBubble('ai', '...');
+                thinkingBubble.classList.add('thinking');
+                renderChatHistory();
+
+                chatTextarea.value = '';
+                adjustChatTextareaHeight();
+                sendChatBtn.disabled = true;
+                
+                try {
+                    const aiResponseText = await generateAiResponse(text);
+                    thinkingBubble.textContent = aiResponseText;
+                    thinkingBubble.classList.remove('thinking');
+                    // Find the placeholder in history and update it
+                    const lastMsgIndex = chatHistory.length > 0 ? chatHistory.length -1 : 0;
+                    if(chatHistory[lastMsgIndex] && chatHistory[lastMsgIndex].text === '...'){
+                       chatHistory[lastMsgIndex].text = aiResponseText;
+                    } else {
+                       chatHistory.push({ type: 'ai', text: aiResponseText });
+                    }
+                } catch (error) {
+                    console.error(error);
+                    const errorMsg = `Error: ${error.message}`;
+                    thinkingBubble.textContent = errorMsg;
+                    thinkingBubble.classList.remove('thinking');
+                    chatHistory.push({ type: 'ai', text: errorMsg });
+                } finally {
+                    localStorage.setItem('devStudioChat', JSON.stringify(chatHistory));
+                    sendChatBtn.disabled = false;
+                    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+                }
+            }
+
+            async function generateAiResponse(userMessage) {
+                const ai = await window.getAiInstance;
+                if (!ai) {
+                    return "AI system not initialized. API Key might be missing.";
+                }
+
+                try {
+                    const model = 'gemini-2.5-flash';
+                    const currentCode = fileContents[currentOpenFile] || '';
+                    const systemInstruction = `You are an expert AI pair programmer. The user is working on a file named '${currentOpenFile}'. Here is the current content of the file:\n\n\`\`\`\n${currentCode}\n\`\`\`\n\nYour task is to be a helpful assistant. You can answer questions about the code, suggest improvements, or generate new code snippets based on the user's request. Keep your responses concise and focused on the user's prompt.`;
+                    
+                    const response = await ai.models.generateContent({
+                        model,
+                        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+                        config: { systemInstruction },
+                    });
+                    
+                    return response.text;
+
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    return `Error communicating with AI: ${error.message}`;
+                }
+            }
+
+            function adjustChatTextareaHeight() {
+                // Temporarily reduce height to allow it to shrink
+                chatTextarea.style.height = 'auto';
+                // Set height to scrollHeight to fit content
+                const newHeight = Math.min(chatTextarea.scrollHeight, 150); // Cap at max-height
+                chatTextarea.style.height = newHeight + 'px';
+            }
+
+            function updateTokenCount() {
+                // This is a simplified mock. In a real app, this would involve tokenizing the editor content.
+                const currentCodeTokens = Math.ceil(codeEditor.value.length / 4); // Rough estimate
+                const chatTokens = chatHistory.reduce((acc, msg) => acc + msg.text.length, 0);
+                const totalTokens = currentCodeTokens + chatTokens;
+                aiSettings.tokenCount.textContent = `${totalTokens} / 1,048,576`;
+            }
+
+            // --- Event Listeners ---
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                isSidebarCollapsed = sidebar.classList.contains('collapsed');
+                localStorage.setItem('devStudioSidebarCollapsed', isSidebarCollapsed);
+            });
+
+            rightSidebarToggle.addEventListener('click', () => {
+                rightSidebar.classList.toggle('collapsed');
+                isRightSidebarCollapsed = rightSidebar.classList.contains('collapsed');
+                localStorage.setItem('devStudioRightSidebarCollapsed', isRightSidebarCollapsed);
+            });
+
+            codeEditor.addEventListener('input', () => {
+                saveCodeToLocalStorage();
+                updateTokenCount(); // Update token count on code change
+            });
+
+            runPreviewBtn.addEventListener('click', updateLivePreview);
+
+            sendChatBtn.addEventListener('click', sendChatMessage);
+            chatTextarea.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault(); // Prevent new line
+                    sendChatMessage();
+                }
+            });
+            chatTextarea.addEventListener('input', adjustChatTextareaHeight);
+
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    switchPanel(button.dataset.targetPanel);
+                });
+            });
+
+            headerToggleButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    switchPanel(button.dataset.target);
+                });
+            });
+
+            fileItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    saveCodeToLocalStorage(); // Save current file's content before switching
+
+                    // Update active file in sidebar
+                    fileItems.forEach(li => li.classList.remove('active'));
+                    item.classList.add('active');
+
+                    const fileKey = item.dataset.fileKey;
+                    currentOpenFile = fileKey;
+                    localStorage.setItem('devStudioCurrentFile', currentOpenFile);
+
+                    codeEditor.value = fileContents[fileKey] || DEFAULT_FILE_CONTENTS[fileKey];
+                    // Always switch to code editor when a file is selected
+                    switchPanel('code-editor-panel');
+                    updateTokenCount(); // Update token count when file changes
+                });
+            });
+
+            // AI Settings Event Listeners
+            // Model Select
+            aiSettings.model.addEventListener('change', saveAiSettings);
+
+            // Temperature Slider/Input Sync
+            aiSettings.temperature.addEventListener('input', () => {
+                aiSettings.temperatureInput.value = aiSettings.temperature.value;
+                saveAiSettings();
+            });
+            aiSettings.temperatureInput.addEventListener('input', () => {
+                let val = parseFloat(aiSettings.temperatureInput.value);
+                if (isNaN(val) || val < 0) val = 0;
+                if (val > 2) val = 2;
+                aiSettings.temperature.value = val;
+                aiSettings.temperatureInput.value = val.toFixed(2); // Keep consistent decimal places
+                saveAiSettings();
+            });
+
+            // Media Resolution Select
+            aiSettings.mediaResolution.addEventListener('change', saveAiSettings);
+
+            // Toggle Switches
+            document.querySelectorAll('.custom-toggle input[type="checkbox"]').forEach(toggle => {
+                toggle.addEventListener('change', saveAiSettings);
+            });
+
+            // Max Output Tokens Slider/Input Sync
+            aiSettings.maxOutputTokensSlider.addEventListener('input', () => {
+                aiSettings.maxOutputTokensInput.value = aiSettings.maxOutputTokensSlider.value;
+                saveAiSettings();
+            });
+            aiSettings.maxOutputTokensInput.addEventListener('input', () => {
+                let val = parseInt(aiSettings.maxOutputTokensInput.value);
+                if (isNaN(val) || val < 10) val = 10;
+                if (val > 2048) val = 2048;
+                aiSettings.maxOutputTokensSlider.value = val;
+                aiSettings.maxOutputTokensInput.value = val;
+                saveAiSettings();
+            });
+
+            // Top P Slider/Input Sync
+            aiSettings.topPSlider.addEventListener('input', () => {
+                aiSettings.topPInput.value = aiSettings.topPSlider.value;
+                saveAiSettings();
+            });
+            aiSettings.topPInput.addEventListener('input', () => {
+                let val = parseFloat(aiSettings.topPInput.value);
+                if (isNaN(val) || val < 0) val = 0;
+                if (val > 1) val = 1;
+                aiSettings.topPSlider.value = val;
+                aiSettings.topPInput.value = val.toFixed(2);
+                saveAiSettings();
+            });
+
+            // Top K Slider/Input Sync
+            aiSettings.topKSlider.addEventListener('input', () => {
+                aiSettings.topKInput.value = aiSettings.topKSlider.value;
+                saveAiSettings();
+            });
+            aiSettings.topKInput.addEventListener('input', () => {
+                let val = parseInt(aiSettings.topKInput.value);
+                if (isNaN(val) || val < 1) val = 1;
+                if (val > 40) val = 40;
+                aiSettings.topKSlider.value = val;
+                aiSettings.topKInput.value = val;
+                saveAiSettings();
+            });
+
+            // Settings Group Expand/Collapse
+            document.querySelectorAll('.settings-group-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const content = document.getElementById(`${header.dataset.group}-content`);
+                    header.classList.toggle('expanded');
+                    content.classList.toggle('expanded');
+                    saveAiSettings(); // Save expanded state
+                });
+            });
+
+            // Action button placeholders (no actual functionality for persistence and constraints)
+            document.getElementById('save-btn').addEventListener('click', () => {
+                saveCodeToLocalStorage();
+                alert('Project code and AI settings saved to your browser\'s local storage!');
+            });
+            document.getElementById('deploy-btn').addEventListener('click', () => {
+                alert('Deploy functionality not implemented in this demo.');
+            });
+            document.getElementById('download-btn').addEventListener('click', () => {
+                alert('Download functionality not implemented in this demo. (Would involve creating a blob and a download link)');
+            });
+            document.getElementById('share-btn').addEventListener('click', () => {
+                alert('Share functionality not implemented in this demo.');
+            });
+
+            // Initial call to set up the first active panel and preview
+            switchPanel(currentActivePanelId); // Re-activate the last active panel
+            if (currentActivePanelId === 'live-preview-panel') {
+                updateLivePreview();
+            }
+            updateTokenCount(); // Initial token count calculation
+        });
+    </script>
+</body>
+</html>
