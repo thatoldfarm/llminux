@@ -1131,12 +1131,12 @@ async function processCodeAssistantResponse(history: ChatMessage[], thinkingBubb
 
 
         let narrative = `Fs_Util executed action: <code>${result.action}</code>.`;
-        });
+        // The extraneous }); was here. It has been removed.
 
-        const jsonText = response.text.trim();
-        const result = JSON.parse(jsonText);
-
-        let narrative = `Fs_Util executed action: <code>${result.action}</code>.`;
+        // The following two lines were part of the old model.generateContent() logic
+        // and are now redundant as result is already parsed from aggregatedResponseText.
+        // const jsonText = response.text.trim();
+        // const result = JSON.parse(jsonText);
 
         switch(result.action) {
             case 'system_log':
