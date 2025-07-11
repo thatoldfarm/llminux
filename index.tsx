@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { GoogleGenAI, GenerateContentResponse, Type } from "https://esm.run/@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Type } from "https://esm.run/@google/genai@1.8.0"; // Pinned to v1.8.0
 import { marked } from "https://esm.run/marked";
 import DOMPurify from "https://esm.run/dompurify";
 
@@ -166,9 +166,8 @@ async function main() {
     return;
   }
   apiKey = process.env.API_KEY;
-  // Try instantiating by passing the API key directly as a string
-  // as shown in some SDK examples, instead of an options object.
-  ai = new GoogleGenAI(apiKey); // Initialization happens here
+  // Reverting to using an options object as new GoogleGenAI(apiKey) caused "API Key must be set" error.
+  ai = new GoogleGenAI({ apiKey }); // Initialization happens here
 
   await loadState(); // Load historical state and AI settings
   await loadAllJsonFilesIntoVFS(); // Load all JSONs from public/
