@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -7,7 +8,7 @@ import { GoogleGenAI } from "https://esm.run/@google/genai";
 import { appState } from './src/state';
 import * as dom from './src/dom';
 import { loadState, logPersistence, renderAssetManager } from './src/persistence';
-import { renderAllChatMessages, renderFileTree, switchTab } from './src/ui';
+import { renderAllChatMessages, renderFileTree, switchTab, renderCaraHud, renderKernelHud, renderMetisHud } from './src/ui';
 import { switchFile } from './src/vfs';
 import { initializeCommands, initializeEventListeners } from './src/events';
 import { setAiInstance } from './src/services';
@@ -24,6 +25,12 @@ async function main() {
 
     initializeEventListeners();
     await loadState();
+    
+    // Handle tab ID migration for old saved states
+    if (appState.currentActiveTabId === 'cara-assistor-tab') {
+        appState.currentActiveTabId = 'assistor-tab';
+    }
+
     initializeCommands();
 
     logPersistence("State loaded. Rendering UI...");
@@ -38,6 +45,9 @@ async function main() {
     if (dom.aiSettingsControls.topPInput) dom.aiSettingsControls.topPInput.value = String(appState.aiSettings.topP);
     if (dom.aiSettingsControls.topKSlider) dom.aiSettingsControls.topKSlider.value = String(appState.aiSettings.topK);
     if (dom.aiSettingsControls.topKInput) dom.aiSettingsControls.topKInput.value = String(appState.aiSettings.topK);
+    if (dom.caraBootstrapSelect) dom.caraBootstrapSelect.value = appState.caraState.activeBootstrapFile;
+    if (dom.editorPaneTextarea) dom.editorPaneTextarea.value = appState.editorContent;
+
     dom.settingsGroupHeaders.forEach(header => {
         const group = header.dataset.group;
         if(group && appState.aiSettings.expandedGroups[group]) {
@@ -49,6 +59,9 @@ async function main() {
     renderAllChatMessages();
     renderFileTree();
     renderAssetManager();
+    renderCaraHud();
+    renderKernelHud();
+    renderMetisHud();
     await switchFile(appState.activeFile?.name || '0index.html');
     await switchTab(appState.currentActiveTabId);
     

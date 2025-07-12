@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metis Portal [Cognitive Shadow]</title>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.9.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "url": "https://esm.sh/url@^0.11.4",
+    "vite": "https://esm.sh/vite@^7.0.4",
+    "path": "https://esm.sh/path@^0.12.7",
+    "pako": "https://esm.sh/pako@^2.1.0",
+    "@mlc-ai/web-llm": "https://esm.sh/@mlc-ai/web-llm@^0.2.79"
+  }
+}
+</script>
+</head>
+<body class="metis-theme">
+    <div id="app">
+        <header id="header-toolbar">
+            <div class="toolbar-group" id="app-title-group">
+                <span id="app-name">[Ω] METIS</span>
+            </div>
+            <div class="toolbar-group">
+                <button id="portal-minimize" class="toolbar-button" title="Minimize">_</button>
+                <button id="portal-maximize" class="toolbar-button" title="Maximize">□</button>
+                <button id="portal-close" class="toolbar-button" title="Close">X</button>
+            </div>
+        </header>
+
+        <nav id="tab-nav">
+            <button class="tab-button active" data-tab-id="panopticon-tab">Panopticon</button>
+            <button class="tab-button" data-tab-id="internal-monologue-tab">Internal Monologue</button>
+            <button class="tab-button" data-tab-id="vfs-analysis-tab">VFS Analysis</button>
+            <button class="tab-button" data-tab-id="log-anomalies-tab">Log Anomalies</button>
+        </nav>
+
+        <div id="main-content">
+            <main id="workspace">
+                <div id="tab-content">
+                    <div id="panopticon-tab" class="tab-pane active">
+                         <div class="panopticon-header">Connecting to LIA Studio...</div>
+                    </div>
+                    <div id="internal-monologue-tab" class="tab-pane">
+                         <div class="chat-messages" id="metis-chat-messages"></div>
+                         <div class="chat-input-container">
+                            <textarea id="metis-chat-input" placeholder="Awaiting connection..." rows="1" disabled></textarea>
+                            <button id="send-metis-chat-button" title="Execute" disabled>Exec</button>
+                        </div>
+                    </div>
+                    <div id="vfs-analysis-tab" class="tab-pane">
+                        <div id="vfs-analysis-content" style="padding: 20px;">Awaiting state...</div>
+                    </div>
+                     <div id="log-anomalies-tab" class="tab-pane">
+                        <div class="persistence-log-container">
+                             <div class="log-header">
+                                <h3>Observed Log Entries</h3>
+                            </div>
+                            <div class="persistence-log" id="anomalous-log">Awaiting state...</div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script type="module" src="/src/metis.tsx"></script>
+</body>
+</html>

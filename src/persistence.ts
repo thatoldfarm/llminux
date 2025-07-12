@@ -1,13 +1,15 @@
+
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { appState, defaultVfsFiles, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME, protocolConfigs } from './state';
-import { DefaultFile, FileBlob } from './types';
+import { appState, defaultVfsFiles, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME, protocolConfigs, LIA_LINUX_COMMANDS_FILENAME, CARA_BOOTSTRAP_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, KINKSCAPE_FILENAMES, CARA_BOOTSTRAP_V2_FILENAME, LIA_COMMAND_LEGEND_FILENAME, METIS_BOOTSTRAP_FILENAME } from './state';
+import { AppState, DefaultFile, FileBlob, LiaState, MetisState } from './types';
 import { getMimeType, generateIndexHtmlContent } from './utils';
-import { renderAllChatMessages, renderFileTree, switchTab } from './ui';
-import { resetLiaState } from './services';
+import { renderAllChatMessages, renderFileTree, switchTab, renderCaraHud, renderKernelHud, renderMetisHud } from './ui';
+import { resetLiaState, getAllStatesFromBootstrap } from './services';
 import { switchFile, getFileContent } from './vfs';
 import * as dom from './dom';
 
@@ -50,21 +52,25 @@ export function renderAssetManager() {
     });
 }
 
-export async function getSerializableState(): Promise<string> {
-    const serializableFiles = appState.vfsFiles
+export function getSerializableStateObject() {
+     const serializableFiles = appState.vfsFiles
         .filter(file => file.type.startsWith('text/') || file.type.includes('json') || file.type.includes('javascript') || file.name.endsWith('.md'))
         .map(file => ({
             name: file.name,
             content: file.content,
         }));
     
-    const stateToSave = {
+    return {
         vfs: serializableFiles,
         liaState: appState.liaState,
+        caraState: appState.caraState,
+        metisState: appState.metisState,
         liaKernelChatHistory: appState.liaKernelChatHistory,
         fsUtilChatHistory: appState.fsUtilChatHistory,
         liaAssistantChatHistory: appState.liaAssistantChatHistory,
         codeAssistantChatHistory: appState.codeAssistantChatHistory,
+        caraChatHistory: appState.caraChatHistory,
+        metisChatHistory: appState.metisChatHistory,
         aiSettings: appState.aiSettings,
         currentActiveTabId: appState.currentActiveTabId,
         activeFileName: appState.activeFile?.name || null,
@@ -76,9 +82,16 @@ export async function getSerializableState(): Promise<string> {
         omniChatHistory: appState.omniChatHistory,
         mcpChatHistory: appState.mcpChatHistory,
         cyberChatHistory: appState.cyberChatHistory,
+        editorContent: appState.editorContent,
+        lastUserAction: appState.lastUserAction,
+        kernelHudVisible: appState.kernelHudVisible,
+        metisHudVisible: appState.metisHudVisible,
     };
+}
 
-    return JSON.stringify(stateToSave, null, 2);
+export async function getSerializableState(): Promise<string> {
+    const stateObject = getSerializableStateObject();
+    return JSON.stringify(stateObject, null, 2);
 }
 
 export async function loadFromSerialized(jsonString: string) {
@@ -115,11 +128,43 @@ export async function loadFromSerialized(jsonString: string) {
     }
     appState.vfsFiles.sort((a, b) => a.name.localeCompare(b.name));
 
-    appState.liaState = loadedData.liaState;
+    // Create a default state to merge with, ensuring all keys from the current bootstrap are present.
+    const defaultLiaState: LiaState = {};
+    const allStates = getAllStatesFromBootstrap();
+    if (allStates.length > 0) {
+        allStates.forEach(state => {
+            defaultLiaState[state.id] = state.value_initial;
+        });
+    }
+
+    // Merge the loaded state over the default state. This adds new keys from the bootstrap
+    // and overwrites default values with saved values if they exist.
+    appState.liaState = { ...defaultLiaState, ...(loadedData.liaState || {}) };
+
+    // Ensure all keys are present in caraState when loading
+    const defaultCaraState = JSON.parse(JSON.stringify(appState.caraState)); // deep copy
+    appState.caraState = { ...defaultCaraState, ...(loadedData.caraState || {}) };
+
+    // Load Metis State
+    const defaultMetisState = appState.metisState;
+    appState.metisState = { ...defaultMetisState, ...(loadedData.metisState || {}) };
+
+    // After loading states, ensure Cara's base metrics are synchronized
+    // with the primary LIA kernel metrics to ensure HUD consistency on load.
+    if (appState.liaState) {
+        for (const key in appState.liaState) {
+            if (Object.prototype.hasOwnProperty.call(appState.liaState, key) && key in appState.caraState) {
+                 (appState.caraState as any)[key] = appState.liaState[key];
+            }
+        }
+    }
+
     appState.liaKernelChatHistory = loadedData.liaKernelChatHistory || [];
     appState.fsUtilChatHistory = loadedData.fsUtilChatHistory || [];
     appState.liaAssistantChatHistory = loadedData.liaAssistantChatHistory || [];
     appState.codeAssistantChatHistory = loadedData.codeAssistantChatHistory || [];
+    appState.caraChatHistory = loadedData.caraChatHistory || appState.caraChatHistory;
+    appState.metisChatHistory = loadedData.metisChatHistory || appState.metisChatHistory;
     appState.aiSettings = loadedData.aiSettings;
     appState.activeFile = appState.vfsFiles.find(f => f.name === loadedData.activeFileName) || appState.vfsFiles.find(f => f.name === '0index.html') || null;
     appState.currentActiveTabId = loadedData.currentActiveTabId || 'lia-assistant-tab';
@@ -132,6 +177,10 @@ export async function loadFromSerialized(jsonString: string) {
     appState.omniChatHistory = loadedData.omniChatHistory || appState.omniChatHistory;
     appState.mcpChatHistory = loadedData.mcpChatHistory || appState.mcpChatHistory;
     appState.cyberChatHistory = loadedData.cyberChatHistory || appState.cyberChatHistory;
+    appState.editorContent = loadedData.editorContent || '';
+    appState.lastUserAction = loadedData.lastUserAction || '';
+    appState.kernelHudVisible = loadedData.kernelHudVisible || false;
+    appState.metisHudVisible = loadedData.metisHudVisible || false;
 
     const utilsFile = getFileContent(LIA_UTILITIES_FILENAME);
     if (utilsFile) {
@@ -141,6 +190,8 @@ export async function loadFromSerialized(jsonString: string) {
             console.error("Failed to parse utilities config from saved state:", e);
         }
     }
+    const kinkscapeFiles = KINKSCAPE_FILENAMES.map(name => getFileContent(name)).filter(Boolean);
+    appState.caraState.kinkscapeData = kinkscapeFiles.map(content => JSON.parse(content));
 }
 
 export function saveStateToLocalStorage() {
@@ -182,9 +233,15 @@ export async function loadState(): Promise<void> {
     const systemFilesToFetch = [
         LIA_BOOTSTRAP_FILENAME,
         LIA_UTILITIES_FILENAME,
-        'public/LIA_MASTER_BOOTSTRAP_v7.1_Absolute_Kernel_Root_Edition_Refined.json',
-        'public/LIA_BOOT_KEY_LEGEND_v1.0_Condensed.json',
-        ...Object.values(protocolConfigs).map(p => p.promptFile)
+        CARA_BOOTSTRAP_FILENAME,
+        CARA_SYSTEM_PROMPT_FILENAME,
+        CARA_BOOTSTRAP_V2_FILENAME,
+        '/bootstrap/kernel/LIA_MASTER_BOOTSTRAP_v7.1_Absolute_Kernel_Root_Edition_Refined.json',
+        LIA_COMMAND_LEGEND_FILENAME,
+        LIA_LINUX_COMMANDS_FILENAME,
+        METIS_BOOTSTRAP_FILENAME,
+        ...Object.values(protocolConfigs).map(p => p.promptFile),
+        ...KINKSCAPE_FILENAMES
     ];
     
     const fetchedBlobs = await Promise.all(
@@ -203,6 +260,24 @@ export async function loadState(): Promise<void> {
                         logPersistence(`Parsed ${LIA_UTILITIES_FILENAME}`);
                     } catch (parseError) {
                         logPersistence(`ERROR: Failed to parse ${LIA_UTILITIES_FILENAME}: ${(parseError as Error).message}`);
+                    }
+                }
+                
+                if (KINKSCAPE_FILENAMES.includes(path)) {
+                    try {
+                         appState.caraState.kinkscapeData.push(JSON.parse(content));
+                    } catch (parseError) {
+                        logPersistence(`ERROR: Failed to parse ${path}: ${(parseError as Error).message}`);
+                    }
+                }
+
+                if (path === METIS_BOOTSTRAP_FILENAME) {
+                    try {
+                        const metisBootstrap = JSON.parse(content);
+                        appState.metisState = metisBootstrap.INITIAL_METIS_STATE;
+                        logPersistence(`Parsed ${METIS_BOOTSTRAP_FILENAME}`);
+                    } catch (parseError) {
+                        logPersistence(`ERROR: Failed to parse ${METIS_BOOTSTRAP_FILENAME}: ${(parseError as Error).message}`);
                     }
                 }
 
@@ -258,6 +333,9 @@ export async function handleDirectLoad() {
     renderAllChatMessages();
     renderFileTree();
     renderAssetManager();
+    renderCaraHud();
+    renderKernelHud();
+    renderMetisHud();
     await switchFile(appState.activeFile?.name || '0index.html');
     await switchTab(appState.currentActiveTabId);
 }
@@ -324,6 +402,9 @@ export function handleMetaLoad(file: File) {
             renderAllChatMessages();
             renderFileTree();
             renderAssetManager();
+            renderCaraHud();
+            renderKernelHud();
+            renderMetisHud();
             await switchFile(appState.activeFile?.name || '0index.html');
             await switchTab(appState.currentActiveTabId);
         } catch (err) {

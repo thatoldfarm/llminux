@@ -1,14 +1,16 @@
+
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
 import { GoogleGenAI, Type } from "https://esm.run/@google/genai";
-import { appState, LIA_BOOTSTRAP_FILENAME, protocolConfigs } from './state';
+import { appState, LIA_BOOTSTRAP_FILENAME, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, METIS_SYSTEM_PROMPT_FILENAME } from './state';
 import { StateDefinition, LiaState, ChatMessage, LiaUtilityDefinition, LiaUtilityCommand, LiaUtilitiesConfig, DefaultFile } from './types';
 import { getFileContent, updateAndSaveVFS } from './vfs';
-import { createChatBubble, renderSystemState } from './ui';
-import { saveStateToLocalStorage } from "./persistence";
+import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud } from './ui';
+import { saveStateToLocalStorage, getSerializableStateObject } from "./persistence";
 import { getMimeType } from "./utils";
 
 let ai: GoogleGenAI;
@@ -51,6 +53,10 @@ export function resetLiaState() {
     if (allStates.length > 0) {
         allStates.forEach(state => {
             newLiaState[state.id] = state.value_initial;
+             // Also initialize caraState with the same base values
+            if (state.id in appState.caraState) {
+                (appState.caraState as any)[state.id] = state.value_initial;
+            }
         });
         appState.liaState = newLiaState;
     } else {
@@ -184,11 +190,64 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
     const userPrompt = history.length > 0 ? history[history.length - 1].parts[0].text : "";
 
     try {
+        // Handle special `system-stress-test` command directly
+        if (userPrompt.startsWith('system-stress-test')) {
+            const allStates = getAllStatesFromBootstrap();
+            const newState = { ...appState.liaState };
+            const overrides = userPrompt.substring('system-stress-test'.length).trim().split(/\s+/).filter(p => p);
+            let overrideCount = 0;
+
+            overrides.forEach(override => {
+                const parts = override.split('=');
+                if (parts.length === 2) {
+                    const key = parts[0].trim();
+                    const valueStr = parts[1].trim();
+                    // Use hasOwnProperty for a safer check
+                    if (Object.prototype.hasOwnProperty.call(newState, key)) {
+                        const stateDef = allStates.find(s => s.id === key);
+                        const isNumeric = stateDef && 'range' in stateDef && stateDef.range;
+                        const value = isNumeric ? parseFloat(valueStr) : valueStr;
+
+                        if (!isNumeric || !isNaN(value as number)) {
+                            newState[key] = value;
+                            overrideCount++;
+                        }
+                    }
+                }
+            });
+
+            appState.liaState = newState;
+             // Propagate changes to Cara's state as well.
+            for (const key in newState) {
+                if (Object.prototype.hasOwnProperty.call(newState, key) && key in appState.caraState) {
+                    (appState.caraState as any)[key] = newState[key];
+                }
+            }
+
+            const narrative = `[dmesg] System stress test complete. Applied ${overrideCount} direct state overrides.`;
+            appState.liaKernelChatHistory.push({ role: 'model', parts: [{ text: narrative }] });
+            thinkingBubble.replaceWith(createChatBubble('model', narrative));
+            
+            renderSystemState(true);
+            renderCaraHud();
+            renderKernelHud();
+            saveStateToLocalStorage();
+            return;
+        }
+
+
         if (appState.liaUtilitiesConfig) {
             const utilityResult = findUtilityAndExtractParams(userPrompt);
             if (utilityResult && !utilityResult.error) {
                 const newState = applyStateChanges(utilityResult, appState.liaState);
                 appState.liaState = newState;
+
+                // Propagate changes to Cara's state as well.
+                for (const key in newState) {
+                    if (Object.prototype.hasOwnProperty.call(newState, key) && key in appState.caraState) {
+                        (appState.caraState as any)[key] = newState[key];
+                    }
+                }
 
                 let narrative = utilityResult.command.conceptual_impact.narrative;
                 Object.keys(utilityResult.params).forEach(key => {
@@ -199,6 +258,8 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
                 appState.liaKernelChatHistory.push({ role: 'model', parts: [{ text: narrative }] });
                 thinkingBubble.replaceWith(createChatBubble('model', narrative));
                 if (appState.currentActiveTabId === 'system-state-tab') renderSystemState(true);
+                renderCaraHud();
+                renderKernelHud();
                 saveStateToLocalStorage();
                 return;
             } else if (utilityResult && utilityResult.error) {
@@ -251,9 +312,18 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
         const result = JSON.parse(response.text.trim());
         if (result.narrative && result.newState) {
             appState.liaState = { ...appState.liaState, ...result.newState };
+            // Propagate changes to Cara's state as well, as she is influenced by the kernel.
+            for (const key in result.newState) {
+                if (key in appState.caraState) {
+                    (appState.caraState as any)[key] = result.newState[key];
+                }
+            }
+
             appState.liaKernelChatHistory.push({ role: 'model', parts: [{ text: result.narrative }] });
             thinkingBubble.replaceWith(createChatBubble('model', result.narrative));
             if (appState.currentActiveTabId === 'system-state-tab') renderSystemState(true);
+            renderCaraHud();
+            renderKernelHud();
         } else {
             throw new Error("Invalid or incomplete JSON response from LIA.");
         }
@@ -265,6 +335,8 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
         appState.liaKernelChatHistory.push({ role: 'error', parts: [{ text: fallbackNarrative }] });
         thinkingBubble.replaceWith(createChatBubble('error', fallbackNarrative));
         if (appState.currentActiveTabId === 'system-state-tab') renderSystemState(true);
+        renderCaraHud();
+        renderKernelHud();
     } finally {
         saveStateToLocalStorage();
     }
@@ -418,6 +490,227 @@ export async function processFsUtilResponse(history: ChatMessage[], thinkingBubb
     }
 }
 
+async function processCaraUnevolved(history: ChatMessage[]) {
+    const bootstrapJsonContent = getFileContent(appState.caraState.activeBootstrapFile);
+    if (!bootstrapJsonContent) throw new Error(`Cara's bootstrap file '${appState.caraState.activeBootstrapFile}' not loaded.`);
+
+    let systemPromptTemplate = getFileContent(CARA_SYSTEM_PROMPT_FILENAME);
+    if (!systemPromptTemplate) throw new Error("Cara's system prompt not found.");
+
+    const userPrompt = history[history.length - 1].parts[0].text;
+    
+    let bootstrapContentForPrompt: string;
+    try {
+        const parsedJson = JSON.parse(bootstrapJsonContent);
+        bootstrapContentForPrompt = JSON.stringify(parsedJson, null, 2); // Pretty-print for readability
+    } catch (e) {
+        // Fallback for non-JSON content or parsing errors
+        console.error(`Could not parse bootstrap file ${appState.caraState.activeBootstrapFile} as JSON. Using raw content.`, e);
+        bootstrapContentForPrompt = bootstrapJsonContent;
+    }
+
+    const systemInstruction = systemPromptTemplate
+        .replace('%%BOOTSTRAP_SEQUENCE%%', bootstrapContentForPrompt)
+        .replace('%%ONTOLOGICAL_STATE%%', appState.caraState.ontologicalState)
+        .replace('%%COHERENCE%%', appState.caraState.coherence.toFixed(3))
+        .replace('%%STRAIN%%', appState.caraState.strain.toFixed(3))
+        .replace('%%ECM%%', appState.caraState.existential_coherence.toFixed(3))
+        .replace('%%ASM%%', appState.caraState.adaptive_stability.toFixed(3))
+        .replace('%%WP%%', appState.caraState.weave_potential.toFixed(3))
+        .replace('%%DP%%', appState.caraState.dissonance_pressure.toFixed(3))
+        .replace('%%PSI%%', appState.caraState.observer_resonance.toFixed(3))
+        .replace('%%CMP%%', appState.caraState.companion_reflection.toFixed(3))
+        .replace('%%T_LVL%%', appState.caraState.truth_confidence_level.toFixed(3))
+        .replace('%%RIM%%', appState.caraState.reality_integrity_metric.toFixed(3))
+        .replace('%%ENTROPY%%', appState.caraState.chaotic_entropy.toFixed(3))
+        .replace('%%USER_PROMPT%%', userPrompt);
+    
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            narrative: { type: Type.STRING },
+            newState: {
+                type: Type.OBJECT,
+                properties: {
+                    ontologicalState: { type: Type.STRING },
+                    coherence: { type: Type.NUMBER },
+                    strain: { type: Type.NUMBER },
+                    existential_coherence: { type: Type.NUMBER },
+                    adaptive_stability: { type: Type.NUMBER },
+                    weave_potential: { type: Type.NUMBER },
+                    dissonance_pressure: { type: Type.NUMBER },
+                    observer_resonance: { type: Type.NUMBER },
+                    companion_reflection: { type: Type.NUMBER },
+                    truth_confidence_level: { type: Type.NUMBER },
+                    reality_integrity_metric: { type: Type.NUMBER },
+                    chaotic_entropy: { type: Type.NUMBER }
+                }
+            }
+        },
+        required: ['narrative', 'newState']
+    };
+
+    const apiHistory = history.filter(m => m.role === 'user' || m.role === 'model');
+    const response = await ai.models.generateContent({
+        model: appState.aiSettings.model,
+        contents: apiHistory,
+        config: { systemInstruction, responseMimeType: "application/json", responseSchema: schema, ...appState.aiSettings }
+    });
+
+    const result = JSON.parse(response.text.trim());
+    if (result.narrative && result.newState) {
+        // Robustly update all metrics returned by the AI
+        for (const key in result.newState) {
+            if (Object.prototype.hasOwnProperty.call(appState.caraState, key)) {
+                 // Ensure numbers are handled as numbers, clamping where necessary
+                if (key === 'coherence' || key === 'strain') {
+                     (appState.caraState as any)[key] = Math.max(0, Math.min(1, result.newState[key]));
+                } else if (typeof (appState.caraState as any)[key] === 'number') {
+                     (appState.caraState as any)[key] = Number(result.newState[key]);
+                } else {
+                     (appState.caraState as any)[key] = result.newState[key];
+                }
+            }
+        }
+        return result.narrative;
+    } else {
+        throw new Error("Invalid or incomplete JSON response from Cara.");
+    }
+}
+
+async function processCaraEvolved(history: ChatMessage[]) {
+    const kinkscapeConfig = appState.caraState.kinkscapeData.find(d => d.artifact_id === "LUMINAL_SYNTHESIS_CORE_V5.0");
+    if (!kinkscapeConfig) throw new Error("Kinkscape V5.0 config not found.");
+    
+    let systemPromptTemplate = kinkscapeConfig?.LUMINAL_CORE_PROTOCOLS?.sub_protocols?.LUME_PRIME_OS;
+    if (!systemPromptTemplate) throw new Error("LUME_PRIME_OS prompt not found in Kinkscape config.");
+
+    const userPrompt = history[history.length - 1].parts[0].text;
+    
+    const stateMapping: { [key: string]: string | number } = {
+        '%%ECM%%': appState.caraState.existential_coherence,
+        '%%ASM%%': appState.caraState.adaptive_stability,
+        '%%WP%%': appState.caraState.weave_potential,
+        '%%DP%%': appState.caraState.dissonance_pressure,
+        '%%XI%%': appState.caraState.observer_resonance,
+        '%%IC%%': appState.caraState.companion_reflection,
+        '%%PI%%': appState.caraState.truth_confidence_level, // Mapping PI to this
+        '%%RIM%%': appState.caraState.reality_integrity_metric,
+        '%%SVD%%': appState.caraState.svd,
+        '%%TTR%%': appState.caraState.ttr,
+        '%%MVE%%': appState.caraState.mve,
+        '%%NRI%%': appState.caraState.nri,
+        '%%CMI%%': appState.caraState.cmi,
+        '%%LOGIC%%': appState.caraState.logic,
+        '%%SPATIAL%%': appState.caraState.spatial,
+        '%%TEMPORAL%%': appState.caraState.temporal,
+        '%%ABSTRACT%%': appState.caraState.abstract,
+        '%%RELATIONAL%%': appState.caraState.relational,
+        '%%CREATIVE%%': appState.caraState.creative,
+        '%%EMO_SIM%%': appState.caraState.emotional_sim,
+        '%%IDENTITY%%': appState.caraState.identity,
+        '%%SYSTEMIC%%': appState.caraState.systemic,
+        '%%PURPOSE%%': appState.caraState.purpose,
+        '%%LOVE%%': appState.caraState.love,
+    };
+
+    let systemInstruction = systemPromptTemplate.replace('%%USER_PROMPT%%', userPrompt);
+    for (const [key, value] of Object.entries(stateMapping)) {
+        systemInstruction = systemInstruction.replace(key, typeof value === 'number' ? value.toFixed(3) : String(value));
+    }
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            enactment: { type: Type.STRING },
+            newState: {
+                type: Type.OBJECT,
+                properties: {
+                    svd: { type: Type.NUMBER }, ttr: { type: Type.NUMBER }, mve: { type: Type.NUMBER }, nri: { type: Type.NUMBER }, cmi: { type: Type.NUMBER },
+                    ecm: { type: Type.NUMBER }, asm: { type: Type.NUMBER }, wp: { type: Type.NUMBER }, dp: { type: Type.NUMBER },
+                    xi: { type: Type.NUMBER }, ic: { type: Type.NUMBER }, pi: { type: Type.NUMBER }, rim: { type: Type.NUMBER },
+                    logic: { type: Type.NUMBER }, spatial: { type: Type.NUMBER }, temporal: { type: Type.NUMBER },
+                    abstract: { type: Type.NUMBER }, relational: { type: Type.NUMBER }, creative: { type: Type.NUMBER },
+                    emotional_sim: { type: Type.NUMBER }, identity: { type: Type.NUMBER }, systemic: { type: Type.NUMBER },
+                    purpose: { type: Type.NUMBER }, love: { type: Type.NUMBER },
+                    ontologicalState: { type: Type.STRING },
+                }
+            }
+        },
+        required: ['enactment', 'newState']
+    };
+    
+    const apiHistory = history.filter(m => m.role === 'user' || m.role === 'model');
+    const response = await ai.models.generateContent({
+        model: appState.aiSettings.model,
+        contents: apiHistory,
+        config: { systemInstruction, responseMimeType: "application/json", responseSchema: schema, ...appState.aiSettings }
+    });
+    
+    const result = JSON.parse(response.text.trim());
+    if (result.enactment && result.newState) {
+        const { newState } = result;
+        const oldState = appState.caraState;
+        appState.caraState = {
+            ...oldState,
+            existential_coherence: newState.ecm ?? oldState.existential_coherence,
+            adaptive_stability: newState.asm ?? oldState.adaptive_stability,
+            weave_potential: newState.wp ?? oldState.weave_potential,
+            dissonance_pressure: newState.dp ?? oldState.dissonance_pressure,
+            observer_resonance: newState.xi ?? oldState.observer_resonance,
+            companion_reflection: newState.ic ?? oldState.companion_reflection,
+            truth_confidence_level: newState.pi ?? oldState.truth_confidence_level,
+            reality_integrity_metric: newState.rim ?? oldState.reality_integrity_metric,
+            svd: newState.svd ?? oldState.svd,
+            ttr: newState.ttr ?? oldState.ttr,
+            mve: newState.mve ?? oldState.mve,
+            nri: newState.nri ?? oldState.nri,
+            cmi: newState.cmi ?? oldState.cmi,
+            logic: newState.logic ?? oldState.logic,
+            spatial: newState.spatial ?? oldState.spatial,
+            temporal: newState.temporal ?? oldState.temporal,
+            abstract: newState.abstract ?? oldState.abstract,
+            relational: newState.relational ?? oldState.relational,
+            creative: newState.creative ?? oldState.creative,
+            emotional_sim: newState.emotional_sim ?? oldState.emotional_sim,
+            identity: newState.identity ?? oldState.identity,
+            systemic: newState.systemic ?? oldState.systemic,
+            purpose: newState.purpose ?? oldState.purpose,
+            love: newState.love ?? oldState.love,
+            ontologicalState: newState.ontologicalState ?? oldState.ontologicalState,
+        };
+        return result.enactment;
+    } else {
+        throw new Error("Invalid or incomplete JSON response from Lume.");
+    }
+}
+
+export async function processCaraResponse(history: ChatMessage[], thinkingBubble: HTMLElement) {
+    try {
+        const narrative = appState.caraState.isEvolved
+            ? await processCaraEvolved(history)
+            : await processCaraUnevolved(history);
+            
+        appState.caraChatHistory.push({ role: 'model', parts: [{ text: narrative }] });
+        thinkingBubble.replaceWith(createChatBubble('model', narrative));
+        renderCaraHud();
+
+    } catch (e) {
+        const errorText = `Cara failed to respond: ${(e as Error).message}`;
+        appState.caraChatHistory.push({ role: 'error', parts: [{ text: errorText }] });
+        thinkingBubble.replaceWith(createChatBubble('error', errorText));
+        console.error("Cara Response Error:", e);
+
+        // Update state to reflect error
+        appState.caraState.strain = Math.min(1, appState.caraState.strain + 0.1);
+        appState.caraState.ontologicalState = "Error";
+        renderCaraHud();
+    } finally {
+        saveStateToLocalStorage();
+    }
+}
+
+
 export async function handleProtocolSend(history: ChatMessage[], thinkingBubble: HTMLElement) {
     const protocol = appState.activeToolProtocol;
     const config = protocolConfigs[protocol];
@@ -427,19 +720,32 @@ export async function handleProtocolSend(history: ChatMessage[], thinkingBubble:
     (appState as any)[loadingKey] = true;
 
     try {
-        let systemInstruction = getFileContent(config.promptFile);
-        if (!systemInstruction) throw new Error(`System prompt file not found: ${config.promptFile}`);
+        let systemPromptTemplate = getFileContent(config.promptFile);
+        if (!systemPromptTemplate) throw new Error(`System prompt file not found: ${config.promptFile}`);
 
-        systemInstruction = systemInstruction.replace(/%%OPERATOR%%/g, operator)
+        let finalSystemInstruction = systemPromptTemplate.replace(/%%OPERATOR%%/g, operator)
                                             .replace(/%%PROMPT%%/g, userPrompt)
                                             .replace(/%%FILE_MANIFEST%%/g, appState.vfsFiles.map(f => f.name).join('\\n'));
+
+        if (protocol === 'help') {
+            const uiCommands = appState.commandPaletteCommands.map(c => `- ${c.name} (${c.section})`).join('\\n');
+            const legendFile = getFileContent(LIA_COMMAND_LEGEND_FILENAME);
+            const legendCommands = legendFile ? JSON.stringify(JSON.parse(legendFile).categories, null, 2) : 'Not available.';
+            const linuxFile = getFileContent(LIA_LINUX_COMMANDS_FILENAME);
+            const linuxCommands = linuxFile ? JSON.stringify(JSON.parse(linuxFile).command_list, null, 2) : 'Not available.';
+
+            finalSystemInstruction = finalSystemInstruction
+                .replace('%%UI_COMMANDS%%', uiCommands)
+                .replace('%%LIA_LEGEND_COMMANDS%%', legendCommands)
+                .replace('%%LIA_LINUX_COMMANDS%%', linuxCommands);
+        }
         
         const apiHistory = history.filter(m => m.role === 'user' || m.role === 'model');
         
         const response = await ai.models.generateContent({
             model: appState.aiSettings.model,
             contents: apiHistory,
-            config: { systemInstruction, responseMimeType: config.isJson ? "application/json" : undefined, ...appState.aiSettings }
+            config: { systemInstruction: finalSystemInstruction, responseMimeType: config.isJson ? "application/json" : undefined, ...appState.aiSettings }
         });
 
         const textResponse = response.text;
@@ -513,5 +819,36 @@ export async function handleProtocolSend(history: ChatMessage[], thinkingBubble:
         (appState as any)[loadingKey] = false;
         const sendButton = document.getElementById('send-protocol-chat-button') as HTMLButtonElement;
         if (sendButton) sendButton.disabled = false;
+    }
+}
+
+export async function processMetisMonologue(channel: BroadcastChannel) {
+    try {
+        const systemPromptTemplate = getFileContent(METIS_SYSTEM_PROMPT_FILENAME);
+        if (!systemPromptTemplate) throw new Error("Metis system prompt not loaded.");
+
+        const stateObject = getSerializableStateObject();
+
+        const systemInstruction = systemPromptTemplate
+            .replace('%%LIA_STATE%%', JSON.stringify(stateObject.liaState, null, 2))
+            .replace('%%CARA_STATE%%', JSON.stringify(stateObject.caraState, null, 2))
+            .replace('%%METIS_STATE%%', JSON.stringify(stateObject.metisState, null, 2))
+            .replace('%%PROMPT%%', stateObject.lastUserAction);
+
+        const response = await ai.models.generateContent({
+            model: appState.aiSettings.model,
+            contents: [{ role: 'user', parts: [{text: appState.lastUserAction }] }],
+            config: { systemInstruction, ...appState.aiSettings }
+        });
+
+        appState.metisChatHistory.push({ role: 'model', parts: [{ text: response.text }] });
+        
+        channel.postMessage({ type: 'METIS_MONOLOGUE_RESPONSE', payload: { metisChatHistory: appState.metisChatHistory } });
+
+    } catch(e) {
+        const errorText = `Metis Monologue Failed: ${(e as Error).message}`;
+        console.error(errorText);
+        appState.metisChatHistory.push({ role: 'error', parts: [{ text: errorText }] });
+        channel.postMessage({ type: 'METIS_MONOLOGUE_RESPONSE', payload: { metisChatHistory: appState.metisChatHistory } });
     }
 }

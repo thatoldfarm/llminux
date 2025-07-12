@@ -7,7 +7,7 @@
 import { appState } from './state';
 import { FileBlob } from './types';
 import { generateIndexHtmlContent, getMimeType } from './utils';
-import { renderFileTree, switchTab } from './ui';
+import { renderFileTree, switchTab, renderEditorTab } from './ui';
 import { renderAssetManager } from './persistence';
 import * as dom from './dom';
 
@@ -74,4 +74,5 @@ export function updateAndSaveVFS(newFiles: FileBlob[]) {
 
     renderFileTree();
     renderAssetManager();
+    renderEditorTab();
 }

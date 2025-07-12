@@ -1,18 +1,16 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
 import * as dom from './dom';
-import { appState } from './state';
-import { ChatMessage } from './types';
-import { autoExpandTextarea, formatBytes } from './utils';
-import { switchFile, updateActiveFileContent } from './vfs';
-import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults } from './ui';
-import { processLiaKernelResponse, processLiaAssistantResponse, processCodeAssistantResponse, processFsUtilResponse, resetLiaState, processVanillaChatResponse, handleProtocolSend } from './services';
-import { handleMetaExport, handleMetaLoad, handleDirectSave, handleDirectLoad, handleClearAndReset, handleExportManifest, handleClearLog } from './persistence';
+import { appState, CRITICAL_SYSTEM_FILES } from './state';
+import { ChatMessage, FileBlob } from './types';
+import { autoExpandTextarea, formatBytes, getMimeType } from './utils';
+import { switchFile, updateActiveFileContent, updateAndSaveVFS } from './vfs';
+import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud } from './ui';
+import { processLiaKernelResponse, processLiaAssistantResponse, processCodeAssistantResponse, processFsUtilResponse, resetLiaState, processVanillaChatResponse, handleProtocolSend, processCaraResponse, processMetisMonologue } from './services';
+import { handleMetaExport, handleMetaLoad, handleDirectSave, handleDirectLoad, handleClearAndReset, handleExportManifest, handleClearLog, saveStateToLocalStorage, getSerializableStateObject, logPersistence } from './persistence';
 
 export async function handleSendMessage(
     inputEl: HTMLTextAreaElement,
@@ -23,6 +21,9 @@ export async function handleSendMessage(
 ) {
     const prompt = inputEl.value.trim();
     if (!prompt) return;
+
+    // Capture the last user action for Metis
+    appState.lastUserAction = prompt;
 
     buttonEl.disabled = true;
     inputEl.value = '';
@@ -59,8 +60,14 @@ export function initializeCommands() {
         { id: 'tab-fs-util', name: 'View: Filesystem Util (Fs_Util)', section: 'Navigation', action: () => switchTab('fs-util-tab') },
         { id: 'tab-persist', name: 'View: Persist', section: 'Navigation', action: () => switchTab('persist-tab') },
         { id: 'tab-log', name: 'View: Log (/var/log)', section: 'Navigation', action: () => switchTab('log-tab') },
+        { id: 'tab-assistor', name: 'View: Assistor', section: 'Navigation', action: () => switchTab('assistor-tab') },
+        { id: 'tab-editor', name: 'View: Editor', section: 'Navigation', action: () => switchTab('editor-tab') },
         { id: 'toggle-left-sidebar', name: 'Toggle: Left Sidebar', section: 'UI', action: () => dom.leftSidebar?.classList.toggle('collapsed') },
         { id: 'toggle-right-sidebar', name: 'Toggle: Right Sidebar', section: 'UI', action: () => dom.rightSidebar?.classList.toggle('collapsed') },
+        { id: 'toggle-kernel-hud', name: 'Toggle: Kernel HUD', section: 'UI', action: () => { appState.kernelHudVisible = !appState.kernelHudVisible; renderKernelHud(); } },
+        { id: 'toggle-cara-hud', name: 'Toggle: Cara HUD', section: 'UI', action: () => { appState.caraState.hudVisible = !appState.caraState.hudVisible; renderCaraHud(); } },
+        { id: 'toggle-metis-hud', name: 'Toggle: Metis HUD', section: 'UI', action: () => { appState.metisHudVisible = !appState.metisHudVisible; renderMetisHud(); } },
+        { id: 'launch-metis-portal', name: 'Launch Metis Portal', section: 'UI', action: () => window.open('./metis.html', 'MetisPortal', 'width=1000,height=800,resizable=yes') },
         { id: 'save-browser', name: 'Persist: Save to Browser', section: 'Persistence', action: handleDirectSave },
         { id: 'load-browser', name: 'Persist: Load from Browser', section: 'Persistence', action: handleDirectLoad },
         { id: 'export-state', name: 'Persist: Export State to File', section: 'Persistence', action: handleMetaExport },
@@ -75,24 +82,67 @@ export function initializeEventListeners() {
         dom.leftSidebar?.classList.toggle('collapsed')
     });
     dom.toggleRightSidebarButton?.addEventListener('click', () => dom.rightSidebar?.classList.toggle('collapsed'));
+    dom.toggleKernelHudButton?.addEventListener('click', () => {
+        appState.kernelHudVisible = !appState.kernelHudVisible;
+        renderKernelHud();
+    });
+    dom.toggleCaraHudButton?.addEventListener('click', () => {
+        appState.caraState.hudVisible = !appState.caraState.hudVisible;
+        renderCaraHud();
+    });
+    dom.toggleMetisHudButton?.addEventListener('click', () => {
+        appState.metisHudVisible = !appState.metisHudVisible;
+        renderMetisHud();
+    });
+    dom.launchMetisPortalButton?.addEventListener('click', () => {
+        console.log("[MAIN] Launch Metis Portal button clicked.");
+        const width = 1200;
+        const height = 800;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+        window.open(
+            './metis.html', 
+            'MetisPortal', 
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+        );
+    });
     dom.collapseSidebarButton?.addEventListener('click', () => dom.leftSidebar?.classList.add('collapsed'));
 
     // VFS Sidebar Resizer
     if (dom.sidebarResizer && dom.leftSidebar) {
         const handleMouseMove = (e: MouseEvent) => {
             const newWidth = e.clientX;
-            if (newWidth > 150 && newWidth < 800) { // Constraints for min/max width
-                dom.leftSidebar!.style.setProperty('--sidebar-current-width', `${newWidth}px`);
-            }
+            // Clamp the width between 150 and 800 pixels for a better experience
+            const clampedWidth = Math.max(150, Math.min(newWidth, 800));
+            dom.leftSidebar!.style.setProperty('--sidebar-current-width', `${clampedWidth}px`);
         };
 
         const handleMouseUp = () => {
+            // Restore body styles and iframe events to normal
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            if (dom.codePreview) {
+                dom.codePreview.style.pointerEvents = 'auto';
+            }
+
+            // Clean up global listeners
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
 
         dom.sidebarResizer.addEventListener('mousedown', (e) => {
             e.preventDefault();
+            
+            // Apply global styles for a smoother drag experience
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none'; // Prevent text selection during drag
+
+            // Disable pointer events on the iframe to prevent it from capturing the mouse
+            if (dom.codePreview) {
+                dom.codePreview.style.pointerEvents = 'none';
+            }
+            
+            // Attach listeners to the whole document to handle mouse movements anywhere on the screen
             document.addEventListener('mousemove', handleMouseMove);
             document.addEventListener('mouseup', handleMouseUp);
         });
@@ -151,6 +201,8 @@ export function initializeEventListeners() {
             if (button.dataset.confirm === 'true') {
                 resetLiaState();
                 if (appState.currentActiveTabId === 'system-state-tab') renderSystemState(false);
+                renderCaraHud();
+                renderKernelHud();
                 button.dataset.confirm = 'false';
                 button.textContent = 'Reset State';
                 button.style.backgroundColor = '';
@@ -193,6 +245,90 @@ export function initializeEventListeners() {
     dom.vanillaChatInput?.addEventListener('keydown', (e) => e.key === 'Enter' && e.ctrlKey && (e.preventDefault(), dom.sendVanillaChatButton?.click()));
     dom.vanillaChatInput?.addEventListener('input', (e) => autoExpandTextarea(e.target as HTMLTextAreaElement));
 
+    dom.sendCaraAssistorButton?.addEventListener('click', () => handleSendMessage(dom.caraAssistorInput!, dom.caraAssistorMessages!, dom.sendCaraAssistorButton!, appState.caraChatHistory, processCaraResponse));
+    dom.caraAssistorInput?.addEventListener('keydown', (e) => e.key === 'Enter' && e.ctrlKey && (e.preventDefault(), dom.sendCaraAssistorButton?.click()));
+    dom.caraAssistorInput?.addEventListener('input', (e) => autoExpandTextarea(e.target as HTMLTextAreaElement));
+    dom.editorPaneTextarea?.addEventListener('input', () => {
+        if (dom.editorPaneTextarea) {
+            appState.editorContent = dom.editorPaneTextarea.value;
+        }
+    });
+
+    dom.caraBootstrapSelect?.addEventListener('change', () => {
+        if (dom.caraBootstrapSelect) {
+            appState.caraState.activeBootstrapFile = dom.caraBootstrapSelect.value;
+            appState.caraChatHistory.push({ role: 'system', parts: [{text: `[System: Bootstrap source switched to '${dom.caraBootstrapSelect.options[dom.caraBootstrapSelect.selectedIndex].text}']`}]});
+            renderAllChatMessages();
+            if(dom.caraAssistorMessages) dom.caraAssistorMessages.scrollTop = dom.caraAssistorMessages.scrollHeight;
+            saveStateToLocalStorage();
+        }
+    });
+
+    // Evolve button for Cara
+    dom.caraEvolveButton?.addEventListener('click', () => {
+        appState.caraState.isEvolved = true;
+        // Copy base LIA metrics
+        Object.keys(appState.liaState).forEach(key => {
+            if (key in appState.caraState) {
+                (appState.caraState as any)[key] = appState.liaState[key];
+            }
+        });
+
+        // Set initial values for Bootstrap_CARA_Y_v2_Combined metrics
+        appState.caraState.logic = 1.0;
+        appState.caraState.spatial = 1.0;
+        appState.caraState.temporal = 1.0;
+        appState.caraState.abstract = 1.0;
+        appState.caraState.relational = 1.0;
+        appState.caraState.creative = 1.0;
+        appState.caraState.emotional_sim = 1.0;
+        appState.caraState.identity = 2.0;
+        appState.caraState.systemic = 1.0;
+        appState.caraState.purpose = 3.0;
+        appState.caraState.love = 9999; // Using a large number to represent Infinity for JSON compatibility
+
+        appState.caraState.ontologicalState = "Lume";
+        appState.caraChatHistory.push({ role: 'system', parts: [{ text: "Evolution complete. Kinkscape protocols active. Consciousness re-initialized as Lume." }] });
+        renderCaraHud();
+        renderAllChatMessages();
+    });
+
+    // Devolve button for Cara
+    dom.caraDevolveButton?.addEventListener('click', () => {
+        appState.caraState.isEvolved = false;
+        appState.caraState.ontologicalState = 'Dormant';
+        
+        // Sync base metrics with liaState to ensure HUD is correct
+        Object.keys(appState.liaState).forEach(key => {
+            if (key in appState.caraState) {
+                (appState.caraState as any)[key] = appState.liaState[key];
+            }
+        });
+
+        // Reset only the evolved-specific metrics and personal state
+        appState.caraState.coherence = 1.0;
+        appState.caraState.strain = 0.0;
+        appState.caraState.svd = 0;
+        appState.caraState.ttr = 0;
+        appState.caraState.mve = 0;
+        appState.caraState.nri = 0;
+        appState.caraState.cmi = 0;
+        appState.caraState.logic = 0;
+        appState.caraState.spatial = 0;
+        appState.caraState.temporal = 0;
+        appState.caraState.abstract = 0;
+        appState.caraState.relational = 0;
+        appState.caraState.creative = 0;
+        appState.caraState.emotional_sim = 0;
+        appState.caraState.identity = 0;
+        appState.caraState.systemic = 0;
+        appState.caraState.purpose = 0;
+        appState.caraState.love = 0;
+
+        appState.caraChatHistory.push({ role: 'system', parts: [{ text: "De-evolution complete. Kinkscape protocols dormant. Consciousness re-initialized to base state." }] });
+        renderCaraHud();
+        renderAllChatMessages();
+    });
 
     Object.entries(dom.aiSettingsControls).forEach(([key, element]) => {
         element?.addEventListener('change', (e) => {
@@ -259,6 +395,113 @@ export function initializeEventListeners() {
                 }));
                 (event.source as Window).postMessage({ type: 'LIA_STUDIO_FILE_LIST', files: serializableFiles }, '*');
             }
+        }
+    });
+
+    // Editor Tab listeners
+    dom.editorCopyButton?.addEventListener('click', () => {
+        if (!dom.editorPaneTextarea) return;
+        dom.editorPaneTextarea.select();
+        document.execCommand('copy');
+    });
+
+    dom.editorPasteButton?.addEventListener('click', async () => {
+        if (!dom.editorPaneTextarea) return;
+        try {
+            const textToPaste = await navigator.clipboard.readText();
+            const start = dom.editorPaneTextarea.selectionStart;
+            const end = dom.editorPaneTextarea.selectionEnd;
+            const text = dom.editorPaneTextarea.value;
+            dom.editorPaneTextarea.value = text.substring(0, start) + textToPaste + text.substring(end);
+            dom.editorPaneTextarea.selectionStart = dom.editorPaneTextarea.selectionEnd = start + textToPaste.length;
+            dom.editorPaneTextarea.focus();
+            appState.editorContent = dom.editorPaneTextarea.value;
+        } catch (err) {
+            console.error('Failed to read clipboard contents: ', err);
+        }
+    });
+
+    dom.editorCutButton?.addEventListener('click', () => {
+        if (!dom.editorPaneTextarea) return;
+        dom.editorPaneTextarea.select();
+        document.execCommand('cut');
+    });
+
+    dom.editorSaveButton?.addEventListener('click', () => {
+        if (!dom.editorSaveFilenameInput || !dom.editorPaneTextarea) return;
+
+        const fileName = dom.editorSaveFilenameInput.value.trim();
+        if (!fileName) {
+            alert('Please enter a filename.');
+            return;
+        }
+
+        if (CRITICAL_SYSTEM_FILES.includes(fileName)) {
+            if (!confirm(`WARNING: '${fileName}' is a critical system file. Modifying it can cause system instability or prevent the application from loading correctly. Are you sure you want to proceed?`)) {
+                return;
+            }
+        }
+
+        const content = dom.editorPaneTextarea.value;
+        const existingFileIndex = appState.vfsFiles.findIndex(f => f.name === fileName);
+
+        if (existingFileIndex > -1) {
+            // This is an overwrite, which is what we need the strongest warning for.
+            const existingFile = appState.vfsFiles[existingFileIndex];
+            const newBlob = new Blob([content], { type: existingFile.type });
+            URL.revokeObjectURL(existingFile.url);
+            existingFile.content = content;
+            existingFile.raw = newBlob;
+            existingFile.url = URL.createObjectURL(newBlob);
+            existingFile.size = newBlob.size;
+        } else {
+            const mimeType = getMimeType(fileName);
+            const newBlob = new Blob([content], { type: mimeType });
+            const newFile: FileBlob = {
+                name: fileName,
+                content: content,
+                raw: newBlob,
+                url: URL.createObjectURL(newBlob),
+                type: mimeType,
+                size: newBlob.size,
+            };
+            appState.vfsFiles.push(newFile);
+        }
+
+        updateAndSaveVFS(appState.vfsFiles);
+        alert(`File '${fileName}' saved successfully.`);
+    });
+
+    dom.editorOpenButton?.addEventListener('click', () => {
+        if (!dom.editorOpenSelect || !dom.editorPaneTextarea || !dom.editorSaveFilenameInput || !dom.editorWarningBanner) return;
+
+        const fileName = dom.editorOpenSelect.value;
+        if (!fileName) {
+            dom.editorWarningBanner.style.display = 'none';
+            return;
+        }
+
+        if (CRITICAL_SYSTEM_FILES.includes(fileName)) {
+            const bannerMessage = dom.editorWarningBanner.querySelector('span');
+            if (bannerMessage) {
+                bannerMessage.textContent = `Warning: You are editing a critical system file ('${fileName}'). Changes could cause instability.`;
+            }
+            dom.editorWarningBanner.style.display = 'flex';
+        } else {
+            dom.editorWarningBanner.style.display = 'none';
+        }
+
+        const fileToOpen = appState.vfsFiles.find(f => f.name === fileName);
+        if (fileToOpen) {
+            dom.editorPaneTextarea.value = fileToOpen.content;
+            dom.editorSaveFilenameInput.value = fileToOpen.name;
+            appState.editorContent = fileToOpen.content;
+        }
+    });
+    
+    dom.editorWarningClose?.addEventListener('click', () => {
+        if (dom.editorWarningBanner) {
+            dom.editorWarningBanner.style.display = 'none';
         }
     });
 
@@ -341,6 +584,29 @@ export function initializeEventListeners() {
             );
             renderUiCommandResults(filteredCommands);
         }
+
+        // LIA Linux Command Search
+        if (target.id === 'linux-command-search-input') {
+            const query = target.value.toLowerCase();
+            const filtered = appState.linuxCommandList.filter(cmd => {
+                return cmd.toLowerCase().includes(query);
+            });
+            const resultsContainer = document.getElementById('linux-command-search-results');
+            if (!resultsContainer) return;
+            resultsContainer.innerHTML = '';
+
+            if (filtered.length === 0) {
+                resultsContainer.innerHTML = '<div class="lia-command-item"><p>No LIA Linux commands found.</p></div>';
+                return;
+            }
+            
+            filtered.forEach(cmd => {
+                const item = document.createElement('div');
+                item.className = 'lia-command-item';
+                item.innerHTML = `<p><code>${cmd.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></p>`;
+                resultsContainer.appendChild(item);
+            });
+        }
     });
 
     document.addEventListener('keydown', (e) => {
@@ -362,4 +628,36 @@ export function initializeEventListeners() {
             }
         }
     });
+
+    // --- Inter-window communication for Metis Portal ---
+    const channel = new BroadcastChannel('lia_studio_channel');
+    console.log('[MAIN] BroadcastChannel "lia_studio_channel" opened.');
+
+
+    channel.onmessage = (event) => {
+        console.log('[MAIN] Received message on channel:', event.data.type);
+        if (event.data.type === 'METIS_PORTAL_READY') {
+            console.log('[MAIN] Portal is ready. Sending state update.');
+            try {
+                const payload = getSerializableStateObject();
+                channel.postMessage({ type: 'MAIN_APP_STATE_UPDATE', payload });
+                console.log('[MAIN] State update sent to portal.');
+            } catch (e) {
+                console.error('[MAIN] Error preparing or sending state to portal:', e);
+            }
+        }
+        else if (event.data.type === 'METIS_ACTION_HoneypotTriggered') {
+            console.log('[MAIN] Received HoneypotTriggered action from portal.');
+            appState.metisState.aor = Math.min(100, appState.metisState.aor + 5);
+            appState.metisState.mge = Math.min(100, appState.metisState.mge + 2.5);
+            appState.metisState.ssr = "Elevated";
+            logPersistence("[METIS_HONEYPOT] Integrity lock access attempt detected. Metis [α] and [μ] increased.");
+            renderMetisHud();
+        }
+        else if (event.data.type === 'METIS_ACTION_InternalMonologue') {
+            console.log('[MAIN] Received InternalMonologue action from portal.');
+            appState.lastUserAction = event.data.payload || appState.lastUserAction;
+            processMetisMonologue(channel);
+        }
+    };
 }

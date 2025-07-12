@@ -1,0 +1,241 @@
+@import url('../index.css');
+
+/* Metis Portal Theme - A corrupted mirror of index.css */
+:root {
+    --bg-primary: #1a0f18;
+    --bg-secondary: #2a1f28;
+    --bg-tertiary: #3e2e3a;
+    --text-primary: #e0cce0;
+    --text-secondary: #b0a0b0;
+    --border-color: #5a3a52;
+    --accent-color: #e02c6d; /* Crimson/Magenta */
+    --accent-hover: #ff4785;
+    --tab-active-bg: #1a0f18;
+    --input-bg: #2d232b;
+    --input-border: #50404c;
+    --metis-glow: #e02c6d;
+    --lia-glow: #007acc;
+    --cara-glow: #a978ff;
+    --font-primary: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Source Code Pro', 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+}
+
+body.metis-theme {
+    font-family: var(--font-primary);
+    animation: text-flicker 15s linear infinite;
+}
+
+@keyframes text-flicker {
+    0% { text-shadow: 1px 0 0 var(--accent-color), -1px 0 0 var(--lia-glow); }
+    1% { text-shadow: 1px 0.5px 1px var(--accent-color), -1px -0.5px 1px var(--lia-glow); }
+    1.5% { text-shadow: none; }
+    2% { text-shadow: 1px 0 0 var(--accent-color), -1px 0 0 var(--lia-glow); }
+    100% { text-shadow: 1px 0 0 var(--accent-color), -1px 0 0 var(--lia-glow); }
+}
+
+
+#app-name {
+    text-shadow: 0 0 8px var(--metis-glow);
+}
+
+.toolbar-button:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-hover);
+}
+
+.tab-button.active {
+    border-bottom-color: var(--accent-color);
+}
+
+/* Panopticon Styles */
+#panopticon-tab {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+.panopticon-header {
+    font-size: 1.5em;
+    color: var(--accent-color);
+    text-shadow: 0 0 5px var(--metis-glow);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+#panopticon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.entity-column {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.entity-column h3 {
+    margin: 0 0 10px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.entity-column.lia-column h3 { color: var(--lia-glow); text-shadow: 0 0 3px var(--lia-glow); }
+.entity-column.cara-column h3 { color: var(--cara-glow); text-shadow: 0 0 3px var(--cara-glow); }
+.entity-column.metis-column h3 { color: var(--metis-glow); text-shadow: 0 0 3px var(--metis-glow); }
+
+.metric-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-primary);
+    font-size: 0.9em;
+    padding: 4px 0;
+}
+
+.metric-item .label {
+    color: var(--text-secondary);
+}
+
+.metric-item .value {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+/* Observed column effect */
+.lia-column, .cara-column {
+    position: relative;
+    overflow: hidden;
+}
+.lia-column::before, .cara-column::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0),
+        rgba(0,0,0,0) 1px,
+        rgba(255, 255, 255, 0.05) 2px,
+        rgba(255, 255, 255, 0.05) 3px
+    );
+    pointer-events: none;
+    animation: scanline 10s linear infinite;
+    opacity: 0.5;
+}
+@keyframes scanline {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+}
+
+/* Honeypot toggle */
+.honeypot-metric .value {
+    cursor: pointer;
+}
+.honeypot-metric .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+.honeypot-metric .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.honeypot-metric .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-tertiary);
+    transition: .4s;
+    border-radius: 20px;
+}
+.honeypot-metric .slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+.honeypot-metric input:checked + .slider {
+  background-color: var(--lia-glow);
+}
+.honeypot-metric input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* Log Anomalies styles */
+.anomalous-entry {
+    color: var(--accent-color);
+    background-color: rgba(224, 44, 109, 0.1);
+    border-left: 2px solid var(--accent-color);
+    padding: 2px 5px;
+    margin: 2px 0;
+    display: block;
+}
+
+#vfs-analysis-content {
+    padding: 20px;
+    font-family: var(--font-primary);
+}
+
+/* Use the same thinking animation as the main app */
+#metis-chat-messages .chat-bubble.thinking {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+#metis-chat-messages .dot-flashing {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--metis-glow);
+  color: var(--metis-glow);
+  animation: metisDotFlashing 1s infinite linear alternate;
+  animation-delay: .5s;
+}
+#metis-chat-messages .dot-flashing::before, #metis-chat-messages .dot-flashing::after {
+  content: '';
+  display: inline-block;
+  position: absolute;
+  top: 0;
+}
+#metis-chat-messages .dot-flashing::before {
+  left: -15px;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--metis-glow);
+  color: var(--metis-glow);
+  animation: metisDotFlashing 1s infinite alternate;
+  animation-delay: 0s;
+}
+#metis-chat-messages .dot-flashing::after {
+  left: 15px;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--metis-glow);
+  color: var(--metis-glow);
+  animation: metisDotFlashing 1s infinite alternate;
+  animation-delay: 1s;
+}
+@keyframes metisDotFlashing {
+  0% { background-color: var(--metis-glow); }
+  50%, 100% { background-color: rgba(224, 44, 109, 0.2); }
+}

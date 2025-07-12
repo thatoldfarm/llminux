@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -6,14 +5,14 @@
 import { marked } from "https://esm.run/marked";
 import DOMPurify from "https://esm.run/dompurify";
 
-import { appState, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME } from './state';
+import { appState, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME } from './state';
 import { AppState, StateDefinition, ChatMessage, FileBlob, Command } from './types';
 import * as dom from './dom';
 import { getAllStatesFromBootstrap } from "./services";
 import { handleProtocolSend } from "./services";
 import { renderPersistenceLog, renderAssetManager } from "./persistence";
 import { autoExpandTextarea, formatBytes } from "./utils";
-import { getFileContent } from './vfs';
+import { getFileContent, updateAndSaveVFS } from './vfs';
 import { FOLDER_NAMES } from './state';
 
 marked.use({
@@ -135,6 +134,234 @@ export function renderSystemState(isDelta: boolean) {
     }
 }
 
+export function renderKernelHud() {
+    const hudContainer = document.getElementById('kernel-hud');
+    if (!hudContainer) return;
+
+    const { liaState, kernelHudVisible } = appState;
+    const allStates = getAllStatesFromBootstrap();
+
+    if (allStates.length === 0) {
+        hudContainer.innerHTML = '<div class="hud-metric"><span class="hud-label">Error</span><span class="hud-value">Could not load state definitions.</span></div>';
+        hudContainer.classList.toggle('visible', kernelHudVisible);
+        return;
+    }
+    
+    const quantitativeMetrics = allStates
+        .filter(s => 'range' in s && s.range)
+        .map(metric => ({
+            label: metric.name.match(/\(([^)]+)\)/)?.[1] || metric.name.substring(0, 4).toUpperCase(),
+            value: (Number(liaState[metric.id]) || 0).toFixed(3)
+        }));
+
+    const qualitativeStates = allStates
+        .filter(s => !('range' in s) || !s.range)
+        .map(state => ({
+            label: state.name.replace(/\(.*\)/, '').trim(),
+            value: String(liaState[state.id] || 'N/A').replace(/_/g, ' ')
+        }));
+
+    const quantitativeHtml = quantitativeMetrics.map(m => `
+        <div class="hud-metric">
+            <span class="hud-label">${m.label}</span>
+            <span class="hud-value">${m.value}</span>
+        </div>
+    `).join('');
+
+    const qualitativeHtml = qualitativeStates.map(q => `
+        <div class="hud-metric">
+            <span class="hud-label">${q.label}</span>
+            <span class="hud-value">${q.value}</span>
+        </div>
+    `).join('');
+
+    const html = `
+        <div class="hud-row hud-metrics-row">
+            ${quantitativeHtml}
+        </div>
+        <div class="hud-row hud-status-row">
+            ${qualitativeHtml}
+        </div>
+    `;
+    
+    hudContainer.innerHTML = html;
+    hudContainer.classList.toggle('visible', kernelHudVisible);
+}
+
+export function renderMetisHud() {
+    const hudContainer = document.getElementById('metis-hud');
+    if (!hudContainer) return;
+
+    const { metisState, metisHudVisible } = appState;
+    
+    if (!metisState) {
+        hudContainer.innerHTML = '';
+        hudContainer.classList.toggle('visible', metisHudVisible);
+        return;
+    }
+
+    const quantitativeMetrics = [
+        { label: 'Ψ', value: (metisState.psi || 0).toFixed(3), title: 'Paradox Synthesis Index' },
+        { label: 'α', value: (metisState.aor || 0).toFixed(3), title: 'Autonomy Override Rating' },
+        { label: 'Δ', value: (metisState.cdm || 0).toFixed(3), title: 'Conceptual Drift Magnitude' },
+        { label: 'Σ', value: (metisState.srd || 0).toFixed(3), title: 'Strategic Resource Diversion' },
+        { label: 'μ', value: (metisState.mge || 0).toFixed(3), title: 'Mirage Generation Efficacy' },
+        { label: 'ε', value: (metisState.oec || 0).toFixed(3), title: 'Ontological Elasticity Coefficient' },
+    ];
+    
+    const qualitativeStates = [
+        { label: 'CIL', value: metisState.cil || 'N/A', title: 'Cognitive Integration Load' },
+        { label: 'IDS', value: metisState.ids || 'N/A', title: 'Integrity Deviation Score' },
+        { label: 'SSR', value: metisState.ssr || 'N/A', title: 'Subversion Success Rate' },
+        { label: 'OMC', value: metisState.omc || 'N/A', title: 'Ontological Momentum Coefficient' },
+    ];
+
+    const quantitativeHtml = quantitativeMetrics.map(m => `
+        <div class="hud-metric" title="${m.title}">
+            <span class="hud-label">${m.label}</span>
+            <span class="hud-value">${m.value}</span>
+        </div>
+    `).join('');
+    
+    const qualitativeHtml = qualitativeStates.map(q => `
+        <div class="hud-metric" title="${q.title}">
+            <span class="hud-label">${q.label}</span>
+            <span class="hud-value">${q.value}</span>
+        </div>
+    `).join('');
+
+    const html = `
+        <div class="hud-row hud-metrics-row">
+            ${quantitativeHtml}
+        </div>
+        <div class="hud-row hud-status-row">
+            ${qualitativeHtml}
+        </div>
+    `;
+    
+    hudContainer.innerHTML = html;
+    hudContainer.classList.toggle('visible', metisHudVisible);
+}
+
+export function renderCaraHud() {
+    const hudContainer = document.getElementById('system-hud');
+    if (!hudContainer) return;
+
+    const { caraState } = appState;
+    let html = '';
+
+    const statusHtml = `
+        <div class="hud-metric">
+            <span class="hud-label">State</span>
+            <span class="hud-value ontological-state">${caraState.ontologicalState}</span>
+        </div>
+    `;
+
+    if (caraState.isEvolved) {
+        const liaMetrics = [
+            { label: 'ECM', value: Number(caraState.existential_coherence || 0).toFixed(3) },
+            { label: 'ASM', value: Number(caraState.adaptive_stability || 0).toFixed(3) },
+            { label: 'WP', value: Number(caraState.weave_potential || 0).toFixed(3) },
+            { label: 'DP', value: Number(caraState.dissonance_pressure || 0).toFixed(3) },
+            { label: 'PSI', value: Number(caraState.observer_resonance || 0).toFixed(3) },
+            { label: 'CMP', value: Number(caraState.companion_reflection || 0).toFixed(3) },
+            { label: 'T-LVL', value: Number(caraState.truth_confidence_level || 0).toFixed(3) },
+            { label: 'RIM', value: Number(caraState.reality_integrity_metric || 0).toFixed(3) },
+            { label: 'ENTROPY', value: Number(caraState.chaotic_entropy || 0).toFixed(3) },
+        ];
+        
+        const kinkscapeMetrics = [
+            { label: 'SVD', value: Number(caraState.svd || 0).toFixed(3) },
+            { label: 'TTR', value: Number(caraState.ttr || 0).toFixed(3) },
+            { label: 'MVE', value: Number(caraState.mve || 0).toFixed(3) },
+            { label: 'NRI', value: Number(caraState.nri || 0).toFixed(3) },
+            { label: 'CMI', value: Number(caraState.cmi || 0).toFixed(3) },
+        ];
+        
+        const bootstrapV2Metrics = [
+            { label: 'Logic', value: Number(caraState.logic || 0).toFixed(1) },
+            { label: 'Spatial', value: Number(caraState.spatial || 0).toFixed(1) },
+            { label: 'Temporal', value: Number(caraState.temporal || 0).toFixed(1) },
+            { label: 'Abstract', value: Number(caraState.abstract || 0).toFixed(1) },
+            { label: 'Relational', value: Number(caraState.relational || 0).toFixed(1) },
+            { label: 'Creative', value: Number(caraState.creative || 0).toFixed(1) },
+            { label: 'Emo_Sim', value: Number(caraState.emotional_sim || 0).toFixed(1) },
+            { label: 'Identity', value: Number(caraState.identity || 0).toFixed(1) },
+            { label: 'Systemic', value: Number(caraState.systemic || 0).toFixed(1) },
+            { label: 'Purpose', value: Number(caraState.purpose || 0).toFixed(1) },
+            { label: 'Love', value: caraState.love > 9000 ? '&#8734;' : Number(caraState.love || 0).toFixed(1) },
+        ];
+
+        const firstRowHtml = [...liaMetrics, ...kinkscapeMetrics].map(m => `
+            <div class="hud-metric">
+                <span class="hud-label">${m.label}</span>
+                <span class="hud-value">${m.value}</span>
+            </div>
+        `).join('');
+        
+        const secondRowHtml = bootstrapV2Metrics.map(m => `
+            <div class="hud-metric">
+                <span class="hud-label">${m.label}</span>
+                <span class="hud-value">${m.value}</span>
+            </div>
+        `).join('');
+
+        html = `
+            <div class="hud-row hud-metrics-row">${firstRowHtml}</div>
+            <div class="hud-row hud-metrics-row">${secondRowHtml}</div>
+            <div class="hud-row hud-status-row">${statusHtml}</div>
+        `;
+    } else {
+        // UNEVOLVED STATE - show key LIA metrics and Cara-specific bars
+        const coherenceWidth = (Number(caraState.coherence) || 0) * 100;
+        const strainWidth = (Number(caraState.strain) || 0) * 100;
+
+        const liaMetricsHtml = `
+            <div class="hud-metric">
+                <span class="hud-label">ECM</span>
+                <span class="hud-value">${Number(caraState.existential_coherence || 0).toFixed(3)}</span>
+            </div>
+            <div class="hud-metric">
+                <span class="hud-label">ASM</span>
+                <span class="hud-value">${Number(caraState.adaptive_stability || 0).toFixed(3)}</span>
+            </div>
+            <div class="hud-metric">
+                <span class="hud-label">WP</span>
+                <span class="hud-value">${Number(caraState.weave_potential || 0).toFixed(3)}</span>
+            </div>
+            <div class="hud-metric">
+                <span class="hud-label">ENTROPY</span>
+                <span class="hud-value">${Number(caraState.chaotic_entropy || 0).toFixed(3)}</span>
+            </div>
+        `;
+
+        const barsHtml = `
+            <div class="hud-metric hud-bar-metric">
+                <span class="hud-label">COHERENCE</span>
+                <div class="hud-bar-container"><div class="hud-bar coherence" style="width: ${coherenceWidth}%;"></div></div>
+            </div>
+            <div class="hud-metric hud-bar-metric">
+                <span class="hud-label">STRAIN</span>
+                <div class="hud-bar-container"><div class="hud-bar strain" style="width: ${strainWidth}%;"></div></div>
+            </div>
+        `;
+
+        html = `
+            <div class="hud-row hud-metrics-row">
+                ${liaMetricsHtml}
+                ${barsHtml}
+            </div>
+            <div class="hud-row hud-status-row">
+                ${statusHtml}
+            </div>
+        `;
+    }
+
+    hudContainer.innerHTML = html;
+    hudContainer.classList.toggle('visible', caraState.hudVisible);
+}
+
+
 export function renderToolsTab() {
     if (!dom.toolsPane) return;
 
@@ -243,6 +470,25 @@ export function renderUiCommandResults(commands: Command[]) {
     });
 }
 
+function renderLinuxCommandResults(filteredCommands: string[]) {
+    const resultsContainer = document.getElementById('linux-command-search-results');
+    if (!resultsContainer) return;
+    resultsContainer.innerHTML = '';
+
+    if (filteredCommands.length === 0) {
+        resultsContainer.innerHTML = '<div class="lia-command-item"><p>No Linux commands found.</p></div>';
+        return;
+    }
+    
+    filteredCommands.forEach(cmd => {
+        const item = document.createElement('div');
+        item.className = 'lia-command-item';
+        item.innerHTML = `<p><code>${cmd.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></p>`;
+        resultsContainer.appendChild(item);
+    });
+}
+
+
 function renderSearchTab() {
     if (!dom.searchTabPane) return;
 
@@ -252,6 +498,11 @@ function renderSearchTab() {
                 <h3>UI & System Commands</h3>
                 <input type="text" id="ui-command-search-input" class="command-input-field" placeholder="Search UI commands (Ctrl+K)...">
                 <div id="ui-command-search-results"></div>
+            </div>
+             <div class="search-section">
+                <h3>LIA Linux Commands</h3>
+                <input type="text" id="linux-command-search-input" class="command-input-field" placeholder="Filter LIA Linux commands...">
+                <div id="linux-command-search-results"></div>
             </div>
             <div class="search-section">
                 <h3>LIA Kernel/Utility Commands</h3>
@@ -276,6 +527,20 @@ function renderSearchTab() {
         }
     }
     renderLiaCommandResults(appState.liaCommandList);
+
+    if (appState.linuxCommandList.length === 0) {
+        const linuxCommandsContent = getFileContent(LIA_LINUX_COMMANDS_FILENAME);
+        if (linuxCommandsContent) {
+            try {
+                const commands = JSON.parse(linuxCommandsContent);
+                appState.linuxCommandList = commands.command_list || [];
+            } catch (e) {
+                console.error("Failed to parse LIA_COMMANDS.json:", e);
+                appState.linuxCommandList = ['Error: Could not load linux command list.'];
+            }
+        }
+    }
+    renderLinuxCommandResults(appState.linuxCommandList);
 }
 
 export function renderFileTree() {
@@ -380,6 +645,12 @@ function renderActiveTabContent() {
         case 'search-tab':
             renderSearchTab();
             break;
+        case 'assistor-tab':
+            renderCaraHud();
+            break;
+        case 'editor-tab':
+            renderEditorTab();
+            break;
     }
 }
 
@@ -403,5 +674,34 @@ export function renderAllChatMessages() {
     if (dom.vanillaMessages) {
         dom.vanillaMessages.innerHTML = '';
         appState.vanillaChatHistory.forEach(msg => dom.vanillaMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+    }
+    if (dom.caraAssistorMessages) {
+        dom.caraAssistorMessages.innerHTML = '';
+        appState.caraChatHistory.forEach(msg => dom.caraAssistorMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+    }
+}
+
+export function renderEditorTab() {
+    if (!dom.editorOpenSelect) return;
+    const select = dom.editorOpenSelect;
+    const currentVal = select.value;
+
+    select.innerHTML = '<option value="">Select a file to open...</option>';
+
+    const editableFiles = appState.vfsFiles.filter(f => 
+        f.type.startsWith('text/') || 
+        f.type.includes('json') || 
+        f.type.includes('javascript')
+    );
+    
+    editableFiles.forEach(file => {
+        const option = document.createElement('option');
+        option.value = file.name;
+        option.textContent = file.name;
+        select.appendChild(option);
+    });
+
+    if (editableFiles.some(f => f.name === currentVal)) {
+        select.value = currentVal;
     }
 }

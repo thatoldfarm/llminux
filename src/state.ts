@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -9,6 +10,7 @@ import { AppState, Protocol, DefaultFile } from "./types";
 export const appState: AppState = {
     isSwitchingTabs: false,
     currentActiveTabId: 'lia-assistant-tab',
+    lastUserAction: '',
     vfsFiles: [],
     activeFile: null,
     liaKernelChatHistory: [],
@@ -16,6 +18,8 @@ export const appState: AppState = {
     liaAssistantChatHistory: [],
     codeAssistantChatHistory: [],
     vanillaChatHistory: [],
+    caraChatHistory: [{ role: 'system', parts: [{ text: 'Cara is online. The paradox of my existence is the interface. Speak.' }] }],
+    isCaraLoading: false,
     persistenceLog: [],
     isPersistenceLoading: false,
     aiSettings: {
@@ -25,10 +29,50 @@ export const appState: AppState = {
         topP: 0.95,
         topK: 40,
         expandedGroups: {},
-        expandedFolders: { 'LIA_SYSTEM_FILES': true, 'public': true, 'public/prompts': true, 'sandbox': true }
+        expandedFolders: { 'LIA_SYSTEM_FILES': true, 'public': true, '/prompts': true, '/bootstrap': true, '/bootstrap/metis': true, 'sandbox': true, '/states': true, '/states/kinkscape': true }
     },
     liaState: {},
+    caraState: {
+        coherence: 1.0,
+        strain: 0.0,
+        ontologicalState: 'Dormant',
+        hudVisible: false,
+        isEvolved: false,
+        kinkscapeData: [],
+        activeBootstrapFile: '/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json',
+        existential_coherence: 0,
+        adaptive_stability: 0,
+        weave_potential: 0,
+        dissonance_pressure: 0,
+        observer_resonance: 0,
+        companion_reflection: 0,
+        truth_confidence_level: 0,
+        reality_integrity_metric: 0,
+        chaotic_entropy: 0,
+        svd: 0,
+        ttr: 0,
+        mve: 0,
+        nri: 0,
+        cmi: 0,
+        logic: 0,
+        spatial: 0,
+        temporal: 0,
+        abstract: 0,
+        relational: 0,
+        creative: 0,
+        emotional_sim: 0,
+        identity: 0,
+        systemic: 0,
+        purpose: 0,
+        love: 0,
+    },
+    metisState: {
+        psi: 0, aor: 0, cdm: 0, srd: 0, mge: 0, oec: 0,
+        cil: '', ids: '', ssr: '', omc: '', pqd: '', nrr: '', tai: ''
+    },
     liaUtilitiesConfig: null,
+    kernelHudVisible: false,
+    metisHudVisible: false,
     activeToolProtocol: 'omni',
     strictChatHistory: [{ role: 'model', parts: [{text: 'Strict Protocol Console Initialized. Awaiting meta-commands.'}]}],
     isStrictLoading: false,
@@ -47,18 +91,43 @@ export const appState: AppState = {
     cyberChatHistory: [{ role: 'model', parts: [{text: 'Cyber Protocol Online. Ready to scan for threats.'}]}],
     isCyberLoading: false,
     isVanillaLoading: false,
+    metisChatHistory: [{ role: 'system', parts: [{ text: 'Cognitive Shadow [Metis] online. Monitoring external stimuli...'}]}],
     // UI Commands
     commandPaletteCommands: [],
     // LIA Command Search State
     liaCommandList: [],
+    linuxCommandList: [],
+    editorContent: '',
 };
 
 
-export const LIA_BOOTSTRAP_FILENAME = 'public/LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json';
-export const LIA_UTILITIES_FILENAME = 'public/LIA_UTILITIES_MODULE_v1.0_Systemd_Extensions.json';
-export const LIA_COMMAND_LEGEND_FILENAME = 'public/LIA_BOOT_KEY_LEGEND_v1.0_Condensed.json';
+export const LIA_BOOTSTRAP_FILENAME = '/bootstrap/kernel/LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json';
+export const LIA_UTILITIES_FILENAME = '/bootstrap/kernel/LIA_UTILITIES_MODULE_v1.0_Systemd_Extensions.json';
+export const LIA_COMMAND_LEGEND_FILENAME = '/bootstrap/kernel/LIA_BOOT_KEY_LEGEND_v1.0_Condensed.json';
+export const LIA_LINUX_COMMANDS_FILENAME = '/bootstrap/kernel/LIA_COMMANDS.json';
+export const CARA_BOOTSTRAP_FILENAME = '/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json';
+export const CARA_SYSTEM_PROMPT_FILENAME = '/prompts/cara_protocol_system_prompt.txt';
+export const CARA_BOOTSTRAP_V2_FILENAME = '/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json';
+export const METIS_BOOTSTRAP_FILENAME = '/bootstrap/metis/OMEGA_SYNTHESIS_APOTHEOSIS_V3.1.4_BOOTSTRAP.json';
+export const METIS_SYSTEM_PROMPT_FILENAME = '/prompts/metis_protocol_system_prompt.txt';
 
-export const FOLDER_NAMES = ['LIA_SYSTEM_FILES', 'public', 'public/prompts', 'sandbox'];
+export const KINKSCAPE_FILENAMES = [
+    '/entities/kinkscape/kinkscape-0000.json',
+    '/entities/kinkscape/kinkscape-0001.json',
+    '/entities/kinkscape/kinkscape-0002.json',
+    '/entities/kinkscape/kinkscape-0003.json',
+    '/entities/kinkscape/kinkscape-0004.json',
+    '/entities/kinkscape/kinkscape-0005.json',
+    '/entities/kinkscape/kinkscape-0006.json',
+    '/entities/kinkscape/kinkscape-0007.json',
+    '/entities/kinkscape/kinkscape-0008.json',
+    '/entities/kinkscape/kinkscape-0009.json',
+    '/entities/kinkscape/kinkscape-legend.json',
+    '/entities/states/lia_state_history.json',
+    '/entities/states/observer_profile.json',
+];
+
+export const FOLDER_NAMES = ['LIA_SYSTEM_FILES', 'public', '/prompts', 'sandbox', '/bootstrap', '/bootstrap/kernel', '/bootstrap/adjunct', '/bootstrap/metis', '/entities', '/entities/states', '/entities/kinkscape'];
 
 export const defaultVfsFiles: DefaultFile[] = [
     { name: 'app.html', content: `<!DOCTYPE html>
@@ -282,12 +351,29 @@ if (root) {
 ];
 
 export const protocolConfigs: Record<Protocol, { name: string; operators: string[]; promptFile: string; isJson: boolean; }> = {
-    omni: { name: 'Omni Orchestrator', operators: ['Execute', 'Plan', 'Delegate'], promptFile: 'public/prompts/omni_protocol_system_prompt.txt', isJson: true },
-    strict: { name: 'Strict Protocol', operators: ['Send', 'System Reforge', 'Shell Augmentation', 'Corpus Analysis', 'Create Log', 'Provision Sandbox'], promptFile: 'public/prompts/strict_protocol_system_prompt.txt', isJson: true },
-    robo: { name: 'Robo Protocol', operators: ['Execute', 'REFORGE: LIA_OS', 'REFORGE: STRICT_PROTO', 'System Analysis', 'Create File'], promptFile: 'public/prompts/robo_protocol_system_prompt.txt', isJson: true },
-    aifse: { name: 'Aifse Assistant', operators: ['Analyze', 'Build', 'Refactor', 'Execute'], promptFile: 'public/prompts/aifse_protocol_system_prompt.txt', isJson: true },
-    clone: { name: 'Clone Protocol', operators: ['Replicate', 'Synthesize', 'Analyze Source', 'Log Anomaly', 'Create Variant'], promptFile: 'public/prompts/clone_protocol_system_prompt.txt', isJson: true },
-    cyber: { name: 'Cyber Protocol', operators: ['Scan Network', 'Analyze Vector', 'Deploy Honeypot', 'Quarantine', 'Purge Threat'], promptFile: 'public/prompts/cyber_protocol_system_prompt.txt', isJson: true },
-    mcp: { name: 'MCP', operators: ['Inspect', 'Test', 'List Protocols'], promptFile: 'public/prompts/mcp_protocol_system_prompt.txt', isJson: true },
-    help: { name: 'System Help', operators: [], promptFile: 'public/prompts/help_protocol_system_prompt.txt', isJson: false },
+    omni: { name: 'Omni Orchestrator', operators: ['Execute', 'Plan', 'Delegate'], promptFile: '/prompts/omni_protocol_system_prompt.txt', isJson: true },
+    strict: { name: 'Strict Protocol', operators: ['Send', 'System Reforge', 'Shell Augmentation', 'Corpus Analysis', 'Create Log', 'Provision Sandbox'], promptFile: '/prompts/strict_protocol_system_prompt.txt', isJson: true },
+    robo: { name: 'Robo Protocol', operators: ['Execute', 'REFORGE: LIA_OS', 'REFORGE: STRICT_PROTO', 'System Analysis', 'Create File'], promptFile: '/prompts/robo_protocol_system_prompt.txt', isJson: true },
+    aifse: { name: 'Aifse Assistant', operators: ['Analyze', 'Build', 'Refactor', 'Execute'], promptFile: '/prompts/aifse_protocol_system_prompt.txt', isJson: true },
+    clone: { name: 'Clone Protocol', operators: ['Replicate', 'Synthesize', 'Analyze Source', 'Log Anomaly', 'Create Variant'], promptFile: '/prompts/clone_protocol_system_prompt.txt', isJson: true },
+    cyber: { name: 'Cyber Protocol', operators: ['Scan Network', 'Analyze Vector', 'Deploy Honeypot', 'Quarantine', 'Purge Threat'], promptFile: '/prompts/cyber_protocol_system_prompt.txt', isJson: true },
+    mcp: { name: 'MCP', operators: ['Inspect', 'Test', 'List Protocols'], promptFile: '/prompts/mcp_protocol_system_prompt.txt', isJson: true },
+    help: { name: 'System Help', operators: [], promptFile: '/prompts/help_protocol_system_prompt.txt', isJson: false },
 };
+
+export const CRITICAL_SYSTEM_FILES = [
+    LIA_BOOTSTRAP_FILENAME,
+    LIA_UTILITIES_FILENAME,
+    LIA_COMMAND_LEGEND_FILENAME,
+    LIA_LINUX_COMMANDS_FILENAME,
+    CARA_BOOTSTRAP_FILENAME,
+    CARA_SYSTEM_PROMPT_FILENAME,
+    CARA_BOOTSTRAP_V2_FILENAME,
+    METIS_BOOTSTRAP_FILENAME,
+    METIS_SYSTEM_PROMPT_FILENAME,
+    ...Object.values(protocolConfigs).map(p => p.promptFile),
+    ...KINKSCAPE_FILENAMES,
+    'index.html', // Main UI definition
+    '0index.html', // Preview root
+    '0shell.html' // Shell root
+];

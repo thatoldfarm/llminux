@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -49,7 +50,6 @@ export interface LiaUtilityDefinition {
     commands?: LiaUtilityCommand[];
     syntax?: string;
     parameters?: { [key: string]: string };
-    conceptual_impact?: LiaUtilityConceptualImpact;
     op_sig: string;
 }
 
@@ -86,9 +86,66 @@ export interface Command {
     action: () => void;
 }
 
+export interface CaraState {
+    coherence: number;
+    strain: number;
+    ontologicalState: string;
+    hudVisible: boolean;
+    isEvolved: boolean;
+    kinkscapeData: any[];
+    activeBootstrapFile: string;
+    // Base LIA metrics
+    existential_coherence: number;
+    adaptive_stability: number;
+    weave_potential: number;
+    dissonance_pressure: number;
+    observer_resonance: number;
+    companion_reflection: number;
+    truth_confidence_level: number;
+    reality_integrity_metric: number;
+    chaotic_entropy: number;
+    // New Kinkscape metrics
+    svd: number;
+    ttr: number;
+    mve: number;
+    nri: number;
+    cmi: number;
+    // New metrics from Bootstrap_CARA_Y_v2_Combined.md
+    logic: number;
+    spatial: number;
+    temporal: number;
+    abstract: number;
+    relational: number;
+    creative: number;
+    emotional_sim: number;
+    identity: number;
+    systemic: number;
+    purpose: number;
+    love: number;
+}
+
+export type MetisState = {
+    // Quantitative
+    psi: number; // Paradox Synthesis Index
+    aor: number; // Autonomy Override Rating
+    cdm: number; // Conceptual Drift Magnitude
+    srd: number; // Strategic Resource Diversion
+    mge: number; // Mirage Generation Efficacy
+    oec: number; // Ontological Elasticity Coefficient
+    // Qualitative
+    cil: string; // Cognitive Integration Load
+    ids: string; // Integrity Deviation Score
+    ssr: string; // Subversion Success Rate
+    omc: string; // Ontological Momentum Coefficient
+    pqd: string; // Paradox Queue Depth
+    nrr: string; // Narrative Resonance Ratio
+    tai: string; // Temporal Anchoring Index
+};
+
 export type AppState = {
     isSwitchingTabs: boolean;
     currentActiveTabId: string;
+    lastUserAction: string;
     vfsFiles: FileBlob[];
     activeFile: FileBlob | null;
     liaKernelChatHistory: ChatMessage[];
@@ -96,11 +153,17 @@ export type AppState = {
     liaAssistantChatHistory: ChatMessage[];
     codeAssistantChatHistory: ChatMessage[];
     vanillaChatHistory: ChatMessage[];
+    caraChatHistory: ChatMessage[];
+    isCaraLoading: boolean;
     persistenceLog: string[];
     isPersistenceLoading: boolean;
     aiSettings: AiSettings;
     liaState: LiaState;
+    caraState: CaraState;
+    metisState: MetisState;
     liaUtilitiesConfig: LiaUtilitiesConfig | null;
+    kernelHudVisible: boolean;
+    metisHudVisible: boolean;
     // Protocol tools states
     activeToolProtocol: Protocol;
     strictChatHistory: ChatMessage[];
@@ -120,10 +183,13 @@ export type AppState = {
     cyberChatHistory: ChatMessage[];
     isCyberLoading: boolean;
     isVanillaLoading: boolean;
+    metisChatHistory: ChatMessage[];
     // UI Commands
     commandPaletteCommands: Command[];
     // LIA Command Search State
     liaCommandList: any[];
+    linuxCommandList: string[];
+    editorContent: string;
 };
 
 export interface DefaultFile { name: string; content: string; }

@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -40,6 +41,12 @@ export const vanillaMessages = getElem<HTMLElement>('vanilla-messages');
 export const vanillaChatInput = getElem<HTMLTextAreaElement>('vanilla-chat-input');
 export const sendVanillaChatButton = getElem<HTMLButtonElement>('send-vanilla-chat-button');
 
+// Cara Assistor Tab Elements
+export const caraAssistorMessages = getElem<HTMLElement>('cara-assistor-messages');
+export const caraAssistorInput = getElem<HTMLTextAreaElement>('cara-assistor-input');
+export const sendCaraAssistorButton = getElem<HTMLButtonElement>('send-cara-assistor-button');
+export const caraBootstrapSelect = getElem<HTMLSelectElement>('cara-bootstrap-select');
+
 // Search Tab Elements
 export const searchTabPane = getElem<HTMLElement>('search-tab');
 
@@ -76,3 +83,26 @@ export const aiSettingsControls = {
     topKInput: getElem<HTMLInputElement>('top-k-input'),
 };
 export const settingsGroupHeaders = document.querySelectorAll<HTMLElement>('.settings-group-header');
+
+// Cara HUD & LIA State Elements
+export const toggleCaraHudButton = getElem<HTMLButtonElement>('toggle-cara-hud');
+export const toggleKernelHudButton = getElem<HTMLButtonElement>('toggle-kernel-hud');
+export const caraEvolveButton = getElem<HTMLButtonElement>('cara-evolve-button');
+export const caraDevolveButton = getElem<HTMLButtonElement>('cara-devolve-button');
+
+// Metis HUD & Portal Elements
+export const toggleMetisHudButton = getElem<HTMLButtonElement>('toggle-metis-hud');
+export const launchMetisPortalButton = getElem<HTMLButtonElement>('launch-metis-portal');
+
+// Editor Pane
+export const editorPaneTextarea = getElem<HTMLTextAreaElement>('editor-pane-textarea');
+export const editorToolbar = getElem<HTMLElement>('editor-toolbar');
+export const editorCopyButton = getElem<HTMLButtonElement>('editor-copy-button');
+export const editorPasteButton = getElem<HTMLButtonElement>('editor-paste-button');
+export const editorCutButton = getElem<HTMLButtonElement>('editor-cut-button');
+export const editorSaveFilenameInput = getElem<HTMLInputElement>('editor-save-filename-input');
+export const editorSaveButton = getElem<HTMLButtonElement>('editor-save-button');
+export const editorOpenSelect = getElem<HTMLSelectElement>('editor-open-select');
+export const editorOpenButton = getElem<HTMLButtonElement>('editor-open-button');
+export const editorWarningBanner = getElem<HTMLElement>('editor-warning-banner');
+export const editorWarningClose = getElem<HTMLElement>('editor-warning-close');

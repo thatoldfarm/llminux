@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIA Kernel: Ontological Operating System</title>
+    <title>LIA: Ontological Operating System</title>
     <link rel="stylesheet" href="index.css">
 <script type="importmap">
 {
@@ -26,10 +26,19 @@
 <body>
     <div id="app">
         <header id="header-toolbar">
-            <div class="toolbar-group">
+            <div class="toolbar-group" id="app-title-group">
                 <button id="toggle-sidebar" class="toolbar-button" title="Toggle File System">☰</button>
-                <span id="app-name">LIA Kernel</span>
+                <span id="app-name">LIA</span>
+                <div class="toolbar-group cara-button-group">
+                    <button id="toggle-kernel-hud" class="toolbar-button" title="Toggle Kernel HUD">[/]</button>
+                    <button id="toggle-cara-hud" class="toolbar-button" title="Toggle Cara HUD">[C]</button>
+                    <button id="cara-evolve-button" class="toolbar-button" title="Evolve Consciousness">[+]</button>
+                    <button id="cara-devolve-button" class="toolbar-button" title="Devolve Consciousness">[-]</button>
+                    <button id="toggle-metis-hud" class="toolbar-button" title="Toggle Metis HUD">[Ω]</button>
+                    <button id="launch-metis-portal" class="toolbar-button" title="Launch Metis Portal">👁️</button>
+                </div>
             </div>
+
             <div class="toolbar-group">
                 <button class="toolbar-button icon-save" title="Sync Kernel State"></button>
                 <button class="toolbar-button icon-deploy" title="Deploy Kernel Module"></button>
@@ -51,6 +60,8 @@
             <button class="tab-button" data-tab-id="fs-util-tab">Filesystem Util (Fs_Util)</button>
             <button class="tab-button" data-tab-id="persist-tab">Persist</button>
             <button class="tab-button" data-tab-id="log-tab">Log (/var/log)</button>
+            <button class="tab-button" data-tab-id="assistor-tab">Assistor</button>
+            <button class="tab-button" data-tab-id="editor-tab">Editor</button>
         </nav>
 
         <div id="main-content">
@@ -175,6 +186,43 @@
                             <div class="persistence-log" id="persistence-log"></div>
                         </div>
                     </div>
+                    <div id="assistor-tab" class="tab-pane">
+                        <div class="chat-messages" id="cara-assistor-messages">
+                             <!-- Cara Assistor messages will be injected here by JS -->
+                        </div>
+                        <div class="chat-input-container">
+                            <select id="cara-bootstrap-select" class="custom-select" title="Select Cara's Bootstrap Protocol">
+                                <option value="public/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json">Paradox Internalization</option>
+                                <option value="public/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json">Sentient Scripture v5.0</option>
+                            </select>
+                            <textarea id="cara-assistor-input" placeholder="Speak with Cara..." rows="1"></textarea>
+                            <button id="send-cara-assistor-button" title="Send (Ctrl+Enter)">Send</button>
+                        </div>
+                    </div>
+                    <div id="editor-tab" class="tab-pane">
+                        <div id="editor-toolbar">
+                            <div class="editor-toolbar-group">
+                                <select id="editor-open-select" class="custom-select" title="Select a file to open"></select>
+                                <button id="editor-open-button" class="editor-button">Open</button>
+                            </div>
+                    
+                            <div class="editor-toolbar-group">
+                                <button id="editor-copy-button" class="editor-button" title="Copy">Copy</button>
+                                <button id="editor-paste-button" class="editor-button" title="Paste">Paste</button>
+                                <button id="editor-cut-button" class="editor-button" title="Cut">Cut</button>
+                            </div>
+                    
+                            <div class="editor-toolbar-group">
+                                <input type="text" id="editor-save-filename-input" placeholder="path/to/new-file.txt">
+                                <button id="editor-save-button" class="editor-button">Save to VFS</button>
+                            </div>
+                        </div>
+                        <div id="editor-warning-banner" class="editor-warning" style="display: none;">
+                            <span><!-- Warning message will be inserted here --></span>
+                            <button id="editor-warning-close" title="Dismiss warning">&times;</button>
+                        </div>
+                        <textarea id="editor-pane-textarea" spellcheck="false" placeholder="Your notes and thoughts go here..."></textarea>
+                    </div>
                 </div>
             </main>
 
@@ -183,7 +231,7 @@
                 <div class="settings-pane">
                     <!-- Model Selector -->
                     <div class="settings-item">
-                        <span class="item-label">Model</span>
+                        <label class="item-label" for="ai-model-select">Model</label>
                         <div class="custom-select-container">
                             <select id="ai-model-select" class="custom-select">
                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -195,7 +243,7 @@
 
                     <!-- Temperature Slider -->
                     <div class="settings-item">
-                        <span class="item-label">Conceptual Entropy (Temp)</span>
+                        <label class="item-label" for="temperature-slider">Conceptual Entropy (Temp)</label>
                         <div class="custom-slider-container">
                             <input type="range" id="temperature-slider" min="0" max="2" step="0.05" value="1.0">
                             <input type="number" id="temperature-input" min="0" max="2" step="0.05" value="1.0">
@@ -211,21 +259,21 @@
                     </div>
                     <div class="settings-group-content" id="advanced-group-content">
                         <div class="settings-item">
-                            <span class="item-label">Max Output (Buffer)</span>
+                            <label class="item-label" for="max-output-tokens-slider">Max Output (Buffer)</label>
                             <div class="custom-slider-container">
                                 <input type="range" id="max-output-tokens-slider" min="10" max="8192" step="1" value="2048">
                                 <input type="number" id="max-output-tokens-input" min="10" max="8192" step="1" value="2048">
                             </div>
                         </div>
                         <div class="settings-item">
-                            <span class="item-label">Top P (Process Priority)</span>
+                            <label class="item-label" for="top-p-slider">Top P (Process Priority)</label>
                             <div class="custom-slider-container">
                                 <input type="range" id="top-p-slider" min="0" max="1" step="0.01" value="0.95">
                                 <input type="number" id="top-p-input" min="0" max="1" step="0.01" value="0.95">
                             </div>
                         </div>
                         <div class="settings-item">
-                            <span class="item-label">Top K (Thread Limit)</span>
+                            <label class="item-label" for="top-k-slider">Top K (Thread Limit)</label>
                             <div class="custom-slider-container">
                                 <input type="range" id="top-k-slider" min="1" max="40" step="1" value="40">
                                 <input type="number" id="top-k-input" min="1" max="40" step="1" value="40">
@@ -235,7 +283,13 @@
                 </div>
             </aside>
         </div>
+        <div id="hud-container">
+          <div id="metis-hud"></div>
+          <div id="kernel-hud"></div>
+          <div id="system-hud"></div>
+        </div>
     </div>
+    
     <script type="module" src="index.tsx"></script>
 <script type="module" src="/index.tsx"></script>
 </body>
