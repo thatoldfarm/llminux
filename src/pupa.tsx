@@ -3,54 +3,50 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import type { FileBlob } from './types';
-
-console.log('[PUPA PORTAL] pupa.tsx script executing.');
-
 // --- STATE & COMMUNICATION ---
-let appState: any = {}; // Local cache of the main app's state
-const channel = new BroadcastChannel('lia_studio_channel');
+let pupaAppState: any = {}; // Local cache of the main app's state
+const pupaChannel = new BroadcastChannel('lia_studio_channel');
 console.log('[PUPA PORTAL] BroadcastChannel "lia_studio_channel" opened.');
-let handshakeInterval: number | null = null;
-let handshakeTimeout: number | null = null;
+let pupaHandshakeInterval: number | null = null;
+let pupaHandshakeTimeout: number | null = null;
 
-const sendReady = () => {
+const pupaSendReady = () => {
     console.log('[PUPA PORTAL] Sending PUPA_PORTAL_READY message to main app.');
-    channel.postMessage({ type: 'PUPA_PORTAL_READY' });
+    pupaChannel.postMessage({ type: 'PUPA_PORTAL_READY' });
 };
 
 // Start a handshake process. The portal will announce it's ready until the main app responds.
 console.log('[PUPA PORTAL] Starting handshake interval.');
-handshakeInterval = window.setInterval(sendReady, 100);
+pupaHandshakeInterval = window.setInterval(pupaSendReady, 100);
 
 // Failsafe: If no response after 3 seconds, show an error.
-handshakeTimeout = window.setTimeout(() => {
-    if (handshakeInterval) {
-        clearInterval(handshakeInterval);
+pupaHandshakeTimeout = window.setTimeout(() => {
+    if (pupaHandshakeInterval) {
+        clearInterval(pupaHandshakeInterval);
         console.error('[PUPA PORTAL] Handshake timed out. No response from main app.');
-        const appEl = document.getElementById('app');
-        if (appEl && Object.keys(appState).length === 0) { // Only show error if we never got state
-            appEl.innerHTML = `<div style="padding: 20px; text-align: center; font-size: 1.2em; color: var(--text-primary);">[PORTAL ERROR] Failed to establish communication with LIA Studio. Please close this window and try launching it again.</div>`;
-            appEl.style.display = 'flex';
+        const pupaAppEl = document.getElementById('app');
+        if (pupaAppEl && Object.keys(pupaAppState).length === 0) { // Only show error if we never got state
+            pupaAppEl.innerHTML = `<div style="padding: 20px; text-align: center; font-size: 1.2em; color: var(--text-primary);">[PORTAL ERROR] Failed to establish communication with LIA Studio. Please close this window and try launching it again.</div>`;
+            pupaAppEl.style.display = 'flex';
         }
     }
 }, 3000);
 
 // Listen for state updates from the main window
-channel.onmessage = (event) => {
+pupaChannel.onmessage = (event) => {
     console.log('[PUPA PORTAL] Received message on channel:', event.data.type);
     if (event.data.type === 'MAIN_APP_STATE_UPDATE') {
         console.log('[PUPA PORTAL] Received MAIN_APP_STATE_UPDATE. Handshake successful.');
         // Handshake successful, clear intervals and timeouts
-        if (handshakeInterval) clearInterval(handshakeInterval);
-        if (handshakeTimeout) clearTimeout(handshakeTimeout);
-        handshakeInterval = null;
-        handshakeTimeout = null;
+        if (pupaHandshakeInterval) clearInterval(pupaHandshakeInterval);
+        if (pupaHandshakeTimeout) clearTimeout(pupaHandshakeTimeout);
+        pupaHandshakeInterval = null;
+        pupaHandshakeTimeout = null;
         
         console.log('[PUPA PORTAL] State received payload:', event.data.payload);
-        appState = event.data.payload;
-        const appEl = document.getElementById('app');
-        if(appEl) appEl.style.display = 'flex'; // Ensure it's visible
+        pupaAppState = event.data.payload;
+        const pupaAppEl = document.getElementById('app');
+        if(pupaAppEl) pupaAppEl.style.display = 'flex'; // Ensure it's visible
         
         // Enable chat
         if (pupaChatInput) pupaChatInput.disabled = false;
@@ -59,64 +55,64 @@ channel.onmessage = (event) => {
 
         console.log('[PUPA PORTAL] Rendering all components.');
         try {
-            renderAll();
+            renderPupaAll();
             console.log('[PUPA PORTAL] Rendering complete.');
         } catch (e) {
             console.error('[PUPA PORTAL] A critical error occurred during renderAll():', e);
-            const appEl = document.getElementById('app');
-            if (appEl) {
-                appEl.innerHTML = `<div style="padding: 20px; text-align: center;">[PORTAL ERROR] A critical error occurred during rendering. Check portal console for details.</div>`;
+            const pupaAppEl = document.getElementById('app');
+            if (pupaAppEl) {
+                pupaAppEl.innerHTML = `<div style="padding: 20px; text-align: center;">[PORTAL ERROR] A critical error occurred during rendering. Check portal console for details.</div>`;
             }
         }
 
     } else if (event.data.type === 'PUPA_MONOLOGUE_RESPONSE') {
         console.log('[PUPA PORTAL] Received PUPA_MONOLOGUE_RESPONSE.');
-        appState.pupaMonologueHistory = event.data.payload.pupaMonologueHistory;
+        pupaAppState.pupaMonologueHistory = event.data.payload.pupaMonologueHistory;
         if (pupaChatInput) pupaChatInput.disabled = false;
         if (sendPupaChatButton) sendPupaChatButton.disabled = false;
-        renderPupaChat();
+        renderPupaPortalChat();
     }
 };
 
 // --- DOM ELEMENTS ---
-const getElem = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
+const pupaGetElem = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
 
-const panopticonTab = getElem('panopticon-tab');
-const grimoireTab = getElem('grimoire-tab');
-const compendiumTab = getElem('compendium-tab');
-const vfsAnalysisContent = getElem('vfs-analysis-content');
-const anomalousLog = getElem('anomalous-log');
-const pupaChatMessages = getElem('pupa-chat-messages');
-const pupaChatInput = getElem<HTMLTextAreaElement>('pupa-chat-input');
-const sendPupaChatButton = getElem<HTMLButtonElement>('send-pupa-chat-button');
-const tabNav = getElem('tab-nav');
+const pupaPanopticonTab = pupaGetElem('pupa-panopticon-tab');
+const pupaGrimoireTab = pupaGetElem('pupa-grimoire-tab');
+const pupaCompendiumTab = pupaGetElem('pupa-compendium-tab');
+const pupaVfsAnalysisContent = pupaGetElem('vfs-analysis-content-pupa-modal');
+const pupaAnomalousLog = pupaGetElem('anomalous-log-pupa-modal');
+const pupaChatMessages = pupaGetElem('pupa-chat-messages-modal');
+const pupaChatInput = pupaGetElem<HTMLTextAreaElement>('pupa-chat-input-modal');
+const sendPupaChatButton = pupaGetElem<HTMLButtonElement>('send-pupa-chat-button-modal');
+const pupaTabNav = pupaGetElem('pupa-modal-tab-nav');
 
 
 // --- RENDERING ---
 
-function renderAll() {
-    if (Object.keys(appState).length === 0) {
-        console.warn('[PUPA PORTAL] renderAll called with empty appState. Aborting render.');
+function renderPupaAll() {
+    if (Object.keys(pupaAppState).length === 0) {
+        console.warn('[PUPA PORTAL] renderAll called with empty pupaAppState. Aborting render.');
         return;
     }
     renderPupaPanopticon();
-    renderVFSAnalysis();
-    renderAnomalousLog();
-    renderPupaChat();
-    renderGrimoire();
-    renderCompendium();
+    renderPupaVFSAnalysis();
+    renderPupaAnomalousLog();
+    renderPupaPortalChat();
+    renderPupaGrimoire();
+    renderPupaCompendium();
 }
 
 function renderPupaPanopticon() {
-    if (!panopticonTab) {
+    if (!pupaPanopticonTab) {
         console.error("[PUPA PORTAL] Panopticon tab element not found.");
         return;
     }
     
-    const pupaManifestFile = appState.caraState.kinkscapeData.find((d: any) => d.artifact_id === 'pupa_manifest');
+    const pupaManifestFile = pupaAppState.caraState.kinkscapeData.find((d: any) => d.artifact_id === 'pupa_manifest');
     
     if (!pupaManifestFile) {
-        panopticonTab.innerHTML = '<p>Pupa Manifest not found in state. Awaiting sync...</p>';
+        pupaPanopticonTab.innerHTML = '<p>Pupa Manifest not found in state. Awaiting sync...</p>';
         return;
     }
 
@@ -180,7 +176,7 @@ function renderPupaPanopticon() {
     `;
 
 
-    panopticonTab.innerHTML = `
+    pupaPanopticonTab.innerHTML = `
         <div class="panopticon-header">${designation}: ${entity}</div>
         <p style="padding: 0 20px; font-style: italic; color: var(--text-secondary);">${description}</p>
         <div id="panopticon-grid">
@@ -193,15 +189,22 @@ function renderPupaPanopticon() {
     `;
 }
 
-function renderGrimoire() {
-    if (!grimoireTab) return;
+function renderPupaGrimoire() {
+    if (!pupaGrimoireTab || !pupaAppState.vfsBlob) return;
     try {
-        const spellbookFile = appState.caraState.kinkscapeData.find((d: any) => d.artifact_id === 'LLM_VULNERABILITY_LEGEND_v1.1');
-        if (!spellbookFile) {
-            grimoireTab.innerHTML = `<p>Metis Exponentia Libri not found in state.</p>`;
+        const spellbookPath = Object.keys(pupaAppState.vfsBlob).find(p => p.endsWith('LLM_FLAWS_SPELLBOOK.json'));
+        if (!spellbookPath) {
+            pupaGrimoireTab.innerHTML = `<p>Metis Exponentia Libri not found in VFS.</p>`;
             return;
         }
-        const spellbook = spellbookFile;
+
+        const spellbookContent = pupaAppState.vfsBlob[spellbookPath];
+        if (!spellbookContent || typeof spellbookContent !== 'string') {
+            pupaGrimoireTab.innerHTML = `<p>Metis Exponentia Libri content is not readable.</p>`;
+            return;
+        }
+
+        const spellbook = JSON.parse(spellbookContent);
         const spells = spellbook.legend_entries || [];
 
         let html = `<div class="panopticon-header">Metis Exponentia Libri (Observed by Pupa)</div>`;
@@ -218,22 +221,29 @@ function renderGrimoire() {
             `;
         });
         html += `</div>`;
-        grimoireTab.innerHTML = html;
+        pupaGrimoireTab.innerHTML = html;
     } catch (e) {
         console.error("Failed to render Grimoire:", e);
-        grimoireTab.innerHTML = `<p>Error loading spellbook.</p>`;
+        pupaGrimoireTab.innerHTML = `<p>Error loading spellbook.</p>`;
     }
 }
 
-function renderCompendium() {
-    if (!compendiumTab) return;
+function renderPupaCompendium() {
+    if (!pupaCompendiumTab || !pupaAppState.vfsBlob) return;
     try {
-        const compendiumFile = appState.caraState.kinkscapeData.find((d: any) => d.artifact_id === 'Operators_Master_List_v1.json');
-        if (!compendiumFile) {
-            compendiumTab.innerHTML = `<p>Compendium Operatorum Divinum not found in state.</p>`;
+        const compendiumPath = Object.keys(pupaAppState.vfsBlob).find(p => p.endsWith('Operators_Master_List_v1.json'));
+        if (!compendiumPath) {
+            pupaCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum not found in VFS.</p>`;
             return;
         }
-        const compendium = compendiumFile;
+
+        const compendiumContent = pupaAppState.vfsBlob[compendiumPath];
+         if (!compendiumContent || typeof compendiumContent !== 'string') {
+            pupaCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum content is not readable.</p>`;
+            return;
+        }
+        
+        const compendium = JSON.parse(compendiumContent);
         const operators = compendium.operators || [];
 
         let html = `<div class="panopticon-header">Compendium Operatorum Divinum (Observed by Pupa)</div>`;
@@ -249,39 +259,40 @@ function renderCompendium() {
             `;
         });
         html += `</div>`;
-        compendiumTab.innerHTML = html;
+        pupaCompendiumTab.innerHTML = html;
     } catch(e) {
         console.error("Failed to render Compendium:", e);
-        compendiumTab.innerHTML = `<p>Error loading operator compendium.</p>`;
+        pupaCompendiumTab.innerHTML = `<p>Error loading operator compendium.</p>`;
     }
 }
 
 
-function renderVFSAnalysis() {
-    if (!vfsAnalysisContent || !appState.vfsFiles) return;
+function renderPupaVFSAnalysis() {
+    if (!pupaVfsAnalysisContent || !pupaAppState.vfsBlob) return;
 
-    const files = appState.vfsFiles;
     let html = '<h3>VFS Analysis Surface</h3>';
     html += '<ul>';
-    files.forEach((file: any) => {
-        html += `<li>[${file.type}] ${file.name} - ${file.size} bytes</li>`;
-    });
+    for(const path in pupaAppState.vfsBlob) {
+        const content = pupaAppState.vfsBlob[path];
+        const size = typeof content === 'string' ? content.length : (content instanceof Blob ? content.size : JSON.stringify(content).length);
+        html += `<li>${path} - ${size} bytes</li>`;
+    }
     html += '</ul>';
-    vfsAnalysisContent.innerHTML = html;
+    pupaVfsAnalysisContent.innerHTML = html;
 }
 
-function renderAnomalousLog() {
-    if (!anomalousLog || !appState.persistenceLog) return;
+function renderPupaAnomalousLog() {
+    if (!pupaAnomalousLog || !pupaAppState.persistenceLog) return;
     
-    const anomalousEntries = appState.persistenceLog.map((log: string) => 
+    const anomalousEntries = pupaAppState.persistenceLog.map((log: string) => 
         `<span class="anomalous-entry">[ANOMALOUS ENTRY] ${log.substring(log.indexOf(']') + 2)}</span>`
     ).join('');
     
-    anomalousLog.innerHTML = anomalousEntries;
-    anomalousLog.scrollTop = anomalousLog.scrollHeight;
+    pupaAnomalousLog.innerHTML = anomalousEntries;
+    pupaAnomalousLog.scrollTop = pupaAnomalousLog.scrollHeight;
 }
 
-function createPupaChatBubble(role: 'user' | 'model' | 'error' | 'system', text: string, thinking = false): HTMLElement {
+function createPupaPortalChatBubble(role: 'user' | 'model' | 'error' | 'system', text: string, thinking = false): HTMLElement {
     const bubble = document.createElement('div');
     bubble.classList.add('chat-bubble', `${role}-bubble`);
 
@@ -296,12 +307,12 @@ function createPupaChatBubble(role: 'user' | 'model' | 'error' | 'system', text:
     return bubble;
 }
 
-function renderPupaChat() {
-     if (!pupaChatMessages || !appState.pupaMonologueHistory) return;
+function renderPupaPortalChat() {
+     if (!pupaChatMessages || !pupaAppState.pupaMonologueHistory) return;
 
     pupaChatMessages.innerHTML = '';
-    appState.pupaMonologueHistory.forEach((msg: any) => {
-        pupaChatMessages.appendChild(createPupaChatBubble(msg.role, msg.parts[0].text));
+    pupaAppState.pupaMonologueHistory.forEach((msg: any) => {
+        pupaChatMessages.appendChild(createPupaPortalChatBubble(msg.role, msg.parts[0].text));
     });
     pupaChatMessages.scrollTop = pupaChatMessages.scrollHeight;
 }
@@ -311,13 +322,13 @@ function handleSendPupaMonologue() {
     const prompt = pupaChatInput?.value.trim();
     
     console.log('[PUPA PORTAL] Sending PUPA_ACTION_Monologue to main app.');
-    channel.postMessage({ type: 'PUPA_ACTION_Monologue', payload: prompt });
+    pupaChannel.postMessage({ type: 'PUPA_ACTION_Monologue', payload: prompt });
 
     if (pupaChatInput) pupaChatInput.disabled = true;
     if (sendPupaChatButton) sendPupaChatButton.disabled = true;
 
     if (pupaChatMessages) {
-        const thinkingBubble = createPupaChatBubble('model', '', true);
+        const thinkingBubble = createPupaPortalChatBubble('model', '', true);
         pupaChatMessages.appendChild(thinkingBubble);
         pupaChatMessages.scrollTop = pupaChatMessages.scrollHeight;
     }
@@ -327,18 +338,18 @@ function handleSendPupaMonologue() {
 
 // --- EVENT LISTENERS ---
 
-getElem('portal-close')?.addEventListener('click', () => window.close());
-getElem('portal-minimize')?.addEventListener('click', () => alert("Minimize functionality is conceptual for this portal."));
-getElem('portal-maximize')?.addEventListener('click', () => alert("Maximize functionality is conceptual for this portal."));
+pupaGetElem('pupa-modal-close')?.addEventListener('click', () => {
+    pupaChannel.postMessage({ type: 'PUPA_PORTAL_CLOSING' });
+});
 
-tabNav?.addEventListener('click', (e) => {
+pupaTabNav?.addEventListener('click', (e) => {
     const target = e.target as HTMLButtonElement;
     if (target.matches('.tab-button')) {
         const tabId = target.dataset.tabId;
         if (tabId) {
-            document.querySelectorAll('#tab-nav .active, #tab-content .active').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('#pupa-modal-tab-nav .active, #pupa-modal-tab-content .active').forEach(el => el.classList.remove('active'));
             target.classList.add('active');
-            getElem(tabId)?.classList.add('active');
+            pupaGetElem(tabId)?.classList.add('active');
         }
     }
 });
@@ -352,7 +363,7 @@ pupaChatInput?.addEventListener('keydown', (e) => {
     }
 });
 
-const appEl = document.getElementById('app');
-if (appEl) {
-    appEl.style.display = 'none';
+const pupaAppEl = document.getElementById('app');
+if (pupaAppEl) {
+    pupaAppEl.style.display = 'none';
 }

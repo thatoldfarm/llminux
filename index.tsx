@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -62,7 +60,7 @@ async function main() {
     renderCaraHud();
     renderKernelHud();
     renderMetisHud();
-    await switchFile(appState.activeFile?.name || '0index.html');
+    await switchFile(appState.activeFilePath || '0index.html');
     await switchTab(appState.currentActiveTabId);
     
     // Collapse sidebars on startup as requested
@@ -72,8 +70,10 @@ async function main() {
     logPersistence("Initialization complete.");
 }
 
-main().catch(e => {
-    console.error("Critical application error:", e);
-    logPersistence(`CRITICAL ERROR: ${e.message}`);
-    document.body.innerHTML = '<h1>A critical error occurred. Please check the console.</h1>';
+main().catch((err: any) => {
+    const error = err || new Error("An unknown error occurred");
+    console.error("Critical application error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logPersistence(`CRITICAL ERROR: ${errorMessage}`);
+    document.body.innerHTML = `<h1>A critical error occurred.</h1><p>Please check the console for details. Error: ${errorMessage}</p>`;
 });

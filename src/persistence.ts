@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { appState, defaultVfsFiles, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME, protocolConfigs, LIA_LINUX_COMMANDS_FILENAME, CARA_BOOTSTRAP_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, KINKSCAPE_FILENAMES, CARA_BOOTSTRAP_V2_FILENAME, LIA_COMMAND_LEGEND_FILENAME, METIS_BOOTSTRAP_FILENAME, METIS_SYSTEM_PROMPT_FILENAME, PUPA_SYSTEM_PROMPT_FILENAME } from './state';
-import { AppState, DefaultFile, FileBlob, LiaState, MetisState } from './types';
-import { getMimeType, generateIndexHtmlContent } from './utils';
+import { appState, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME, protocolConfigs, LIA_LINUX_COMMANDS_FILENAME, CARA_BOOTSTRAP_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, KINKSCAPE_FILENAMES, CARA_BOOTSTRAP_V2_FILENAME, LIA_COMMAND_LEGEND_FILENAME, METIS_BOOTSTRAP_FILENAME, METIS_SYSTEM_PROMPT_FILENAME, PUPA_SYSTEM_PROMPT_FILENAME } from './state';
+import { AppState, LiaState, MetisState, VFSBlob } from './types';
+import { getMimeType, blobToBase64, base64ToBlob } from './utils';
 import { renderAllChatMessages, renderFileTree, switchTab, renderCaraHud, renderKernelHud, renderMetisHud } from './ui';
 import { resetLiaState, getAllStatesFromBootstrap } from './services';
-import { switchFile, getFileContent } from './vfs';
+import { switchFile, getFileContentAsText, saveFileToVFS, getFileContentAsBlob } from './vfs';
 import * as dom from './dom';
 
 export function logPersistence(message: string) {
@@ -38,28 +38,42 @@ export function renderAssetManager() {
     if (!dom.assetListContainer) return;
 
     dom.assetListContainer.innerHTML = '';
+    const paths = Object.keys(appState.vfsBlob).sort();
 
-    appState.vfsFiles.forEach(file => {
+    paths.forEach(path => {
         const item = document.createElement('div');
         item.className = 'asset-item';
+        const blob = getFileContentAsBlob(path);
+        const url = blob instanceof Blob ? URL.createObjectURL(blob) : '#';
+
         item.innerHTML = `
-            <span>${file.name}</span>
-            <button class="download-asset-button" data-url="${file.url}" data-name="${file.name}">Download</button>
+            <span>${path}</span>
+            <button class="download-asset-button" data-url="${url}" data-name="${path}">Download</button>
         `;
-        dom.assetListContainer.appendChild(item);
+        dom.assetListContainer!.appendChild(item);
     });
 }
 
-export function getSerializableStateObject() {
-     const serializableFiles = appState.vfsFiles
-        .filter(file => file.type.startsWith('text/') || file.type.includes('json') || file.type.includes('javascript') || file.name.endsWith('.md'))
-        .map(file => ({
-            name: file.name,
-            content: file.content,
-        }));
-    
+async function getSerializableVfsBlob(): Promise<Record<string, any>> {
+    const serializableBlob: Record<string, any> = {};
+    for (const path in appState.vfsBlob) {
+        const content = appState.vfsBlob[path];
+        if (content instanceof Blob) {
+            serializableBlob[path] = {
+                __isBlob: true,
+                type: content.type,
+                content: await blobToBase64(content)
+            };
+        } else {
+            serializableBlob[path] = content;
+        }
+    }
+    return serializableBlob;
+}
+
+export async function getSerializableStateObject() {
     return {
-        vfs: serializableFiles,
+        vfsBlob: await getSerializableVfsBlob(),
         liaState: appState.liaState,
         caraState: appState.caraState,
         metisState: appState.metisState,
@@ -72,7 +86,7 @@ export function getSerializableStateObject() {
         pupaMonologueHistory: appState.pupaMonologueHistory,
         aiSettings: appState.aiSettings,
         currentActiveTabId: appState.currentActiveTabId,
-        activeFileName: appState.activeFile?.name || null,
+        activeFilePath: appState.activeFilePath,
         strictChatHistory: appState.strictChatHistory,
         roboChatHistory: appState.roboChatHistory,
         cloneChatHistory: appState.cloneChatHistory,
@@ -89,47 +103,28 @@ export function getSerializableStateObject() {
 }
 
 export async function getSerializableState(): Promise<string> {
-    const stateObject = getSerializableStateObject();
+    const stateObject = await getSerializableStateObject();
     return JSON.stringify(stateObject, null, 2);
 }
 
 export async function loadFromSerialized(jsonString: string) {
     const loadedData = JSON.parse(jsonString);
 
-    appState.vfsFiles.forEach(file => {
-        if(file.url) URL.revokeObjectURL(file.url);
-    });
-
-    const loadedFiles: DefaultFile[] = loadedData.vfs;
-    const vfsFiles = await Promise.all(
-        loadedFiles.map(async (file) => {
-            const type = getMimeType(file.name);
-            const blob = new Blob([file.content], { type });
-            const url = URL.createObjectURL(blob);
-            return { ...file, raw: blob, url, type, size: blob.size };
-        })
-    );
-    appState.vfsFiles = vfsFiles;
-
-    const indexContent = generateIndexHtmlContent(appState.vfsFiles);
-    let indexFile = appState.vfsFiles.find(f => f.name === '0index.html');
-    const indexMimeType = 'text/html';
-    const indexBlob = new Blob([indexContent], { type: indexMimeType });
-    const indexUrl = URL.createObjectURL(indexBlob);
-    if (indexFile) {
-        if(indexFile.url) URL.revokeObjectURL(indexFile.url);
-        indexFile.raw = indexBlob;
-        indexFile.url = indexUrl;
-        indexFile.size = indexBlob.size;
-        indexFile.content = indexContent;
-    } else {
-        appState.vfsFiles.push({ name: '0index.html', content: indexContent, raw: indexBlob, url: indexUrl, type: indexMimeType, size: indexBlob.size });
+    // Reconstruct vfsBlob
+    appState.vfsBlob = {};
+    const loadedVfs = loadedData.vfsBlob || {};
+    for (const path in loadedVfs) {
+        const fileData = loadedVfs[path];
+        if (fileData && fileData.__isBlob) {
+            appState.vfsBlob[path] = await base64ToBlob(fileData.content, fileData.type);
+        } else {
+            appState.vfsBlob[path] = fileData;
+        }
     }
-    appState.vfsFiles.sort((a, b) => a.name.localeCompare(b.name));
-
+    
     // Create a default state to merge with, ensuring all keys from the current bootstrap are present.
     const defaultLiaState: LiaState = {};
-    const allStates = getAllStatesFromBootstrap();
+    const allStates = await getAllStatesFromBootstrap();
     if (allStates.length > 0) {
         allStates.forEach(state => {
             defaultLiaState[state.id] = state.value_initial;
@@ -166,7 +161,7 @@ export async function loadFromSerialized(jsonString: string) {
     appState.metisChatHistory = loadedData.metisChatHistory || appState.metisChatHistory;
     appState.pupaMonologueHistory = loadedData.pupaMonologueHistory || appState.pupaMonologueHistory;
     appState.aiSettings = loadedData.aiSettings;
-    appState.activeFile = appState.vfsFiles.find(f => f.name === loadedData.activeFileName) || appState.vfsFiles.find(f => f.name === '0index.html') || null;
+    appState.activeFilePath = loadedData.activeFilePath || '0index.html';
     appState.currentActiveTabId = loadedData.currentActiveTabId || 'lia-assistant-tab';
     
     appState.strictChatHistory = loadedData.strictChatHistory || appState.strictChatHistory;
@@ -182,16 +177,20 @@ export async function loadFromSerialized(jsonString: string) {
     appState.kernelHudVisible = loadedData.kernelHudVisible || false;
     appState.metisHudVisible = loadedData.metisHudVisible || false;
 
-    const utilsFile = getFileContent(LIA_UTILITIES_FILENAME);
-    if (utilsFile) {
+    const utilsFileContent = await getFileContentAsText(LIA_UTILITIES_FILENAME);
+    if (utilsFileContent) {
         try {
-            appState.liaUtilitiesConfig = JSON.parse(utilsFile);
+            appState.liaUtilitiesConfig = JSON.parse(utilsFileContent);
         } catch(e) {
             console.error("Failed to parse utilities config from saved state:", e);
         }
     }
-    const kinkscapeFiles = KINKSCAPE_FILENAMES.map(name => getFileContent(name)).filter(Boolean);
-    appState.caraState.kinkscapeData = kinkscapeFiles.map(content => JSON.parse(content));
+
+    const kinkscapeFileContents = await Promise.all(KINKSCAPE_FILENAMES.map(name => getFileContentAsText(name)));
+    appState.caraState.kinkscapeData = kinkscapeFileContents.filter(Boolean).map(content => JSON.parse(content!));
+
+    // Re-save to local storage to update it
+    saveStateToLocalStorage();
 }
 
 export function saveStateToLocalStorage() {
@@ -216,19 +215,15 @@ export async function loadState(): Promise<void> {
         } catch (e) {
             console.error("Failed to load from localStorage, initializing fresh state.", e);
             logPersistence(`Error restoring session: ${(e as Error).message}. Initializing a new session.`);
+            // Clear corrupted state
+            localStorage.removeItem('lia_studio_state');
         }
     }
 
     logPersistence('No valid session found. Initializing a new session from default files...');
     
-    let processedFiles: FileBlob[] = await Promise.all(
-        defaultVfsFiles.map(async (file) => {
-            const type = getMimeType(file.name);
-            const blob = new Blob([file.content], { type });
-            const url = URL.createObjectURL(blob);
-            return { ...file, raw: blob, url, type, size: blob.size };
-        })
-    );
+    // Clear any potentially lingering old state
+    appState.vfsBlob = {};
 
     const systemFilesToFetch = [
         LIA_BOOTSTRAP_FILENAME,
@@ -246,80 +241,57 @@ export async function loadState(): Promise<void> {
         ...KINKSCAPE_FILENAMES
     ];
     
-    const fetchedBlobs = await Promise.all(
+    await Promise.all(
         [...new Set(systemFilesToFetch)].map(async (path) => {
             try {
                 const response = await fetch(path);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const content = await response.text();
-                const type = getMimeType(path);
-                const blob = new Blob([content], { type });
-                const url = URL.createObjectURL(blob);
-
-                if (path === LIA_UTILITIES_FILENAME) {
-                    try {
-                        appState.liaUtilitiesConfig = JSON.parse(content);
-                        logPersistence(`Parsed ${LIA_UTILITIES_FILENAME}`);
-                    } catch (parseError) {
-                        logPersistence(`ERROR: Failed to parse ${LIA_UTILITIES_FILENAME}: ${(parseError as Error).message}`);
-                    }
-                }
-                
-                if (KINKSCAPE_FILENAMES.includes(path)) {
-                    try {
-                         appState.caraState.kinkscapeData.push(JSON.parse(content));
-                    } catch (parseError) {
-                        logPersistence(`ERROR: Failed to parse ${path}: ${(parseError as Error).message}`);
-                    }
-                }
-
-                // REMOVED FAULTY LOGIC FOR METIS STATE
-                // The V13 bootstrap file is a prompt, not a state definition.
-                // The default state defined in `state.ts` is sufficient for a fresh session.
-                /*
-                if (path === METIS_BOOTSTRAP_FILENAME) {
-                    try {
-                        const metisBootstrap = JSON.parse(content);
-                        appState.metisState = metisBootstrap.INITIAL_METIS_STATE;
-                        logPersistence(`Parsed ${METIS_BOOTSTRAP_FILENAME}`);
-                    } catch (parseError) {
-                        logPersistence(`ERROR: Failed to parse ${METIS_BOOTSTRAP_FILENAME}: ${(parseError as Error).message}`);
-                    }
-                }
-                */
-
-                return { name: path, content, raw: blob, url, type, size: blob.size };
+                saveFileToVFS(path, content);
             } catch (e) {
                 logPersistence(`Error loading system file ${path}: ${(e as Error).message}`);
                 console.error(`Failed to fetch ${path}`, e);
-                return null;
             }
         })
     );
     
-    processedFiles.push(...fetchedBlobs.filter((blob): blob is FileBlob => blob !== null));
-    appState.vfsFiles = processedFiles;
-
-    const indexContent = generateIndexHtmlContent(appState.vfsFiles);
-    const indexMimeType = 'text/html';
-    const indexBlob = new Blob([indexContent], { type: indexMimeType });
-    appState.vfsFiles.push({
-        name: '0index.html',
-        content: indexContent,
-        raw: indexBlob,
-        url: URL.createObjectURL(indexBlob),
-        type: indexMimeType,
-        size: indexBlob.size
+    // Add initial shell files
+    appState.vfsBlob['/etc/motd'] = 'Welcome to the LIA Virtual Shell.\n';
+    
+    // Add 0index.html which is now static
+    const indexContent = await fetch('0index.html').then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch 0index.html: ${res.status}`);
+        return res.text();
     });
-    appState.vfsFiles.sort((a, b) => a.name.localeCompare(b.name));
+    saveFileToVFS('0index.html', indexContent);
 
-    resetLiaState();
+    const utilsContent = await getFileContentAsText(LIA_UTILITIES_FILENAME);
+    if (utilsContent) {
+        try {
+            appState.liaUtilitiesConfig = JSON.parse(utilsContent);
+            logPersistence(`Parsed ${LIA_UTILITIES_FILENAME}`);
+        } catch (e) {
+            logPersistence(`ERROR: Failed to parse ${LIA_UTILITIES_FILENAME}: ${(e as Error).message}`);
+        }
+    }
+    
+    const kinkscapeContents = await Promise.all(KINKSCAPE_FILENAMES.map(name => getFileContentAsText(name)));
+    appState.caraState.kinkscapeData = kinkscapeContents
+        .filter((content): content is string => !!content)
+        .map(content => {
+            try { return JSON.parse(content); } catch (e) {
+                logPersistence(`ERROR: Failed to parse kinkscape file: ${(e as Error).message}`);
+                return null;
+            }
+        }).filter(Boolean);
+
+    await resetLiaState();
 
     appState.liaKernelChatHistory = [];
     appState.fsUtilChatHistory = [];
     appState.liaAssistantChatHistory = [];
     appState.codeAssistantChatHistory = [];
-    appState.activeFile = appState.vfsFiles.find(f => f.name === '0index.html') || null;
+    appState.activeFilePath = '0index.html';
     appState.currentActiveTabId = 'lia-assistant-tab';
     
     appState.isPersistenceLoading = false;
@@ -337,13 +309,13 @@ export async function handleDirectLoad() {
     await loadState();
     appState.isPersistenceLoading = false;
 
-    renderAllChatMessages();
-    renderFileTree();
-    renderAssetManager();
-    renderCaraHud();
-    renderKernelHud();
-    renderMetisHud();
-    await switchFile(appState.activeFile?.name || '0index.html');
+    await renderAllChatMessages();
+    await renderFileTree();
+    await renderAssetManager();
+    await renderCaraHud();
+    await renderKernelHud();
+    await renderMetisHud();
+    await switchFile(appState.activeFilePath || '0index.html');
     await switchTab(appState.currentActiveTabId);
 }
 
@@ -377,10 +349,13 @@ export async function handleMetaExport() {
 export async function handleExportManifest() {
     logPersistence('Exporting blob URL manifest...');
     try {
-        const manifest = appState.vfsFiles.reduce((acc, file) => {
-            acc[file.name] = file.url;
-            return acc;
-        }, {} as Record<string, string>);
+        const manifest: Record<string, string> = {};
+        for(const path in appState.vfsBlob) {
+            const blob = getFileContentAsBlob(path);
+            if(blob instanceof Blob) {
+                manifest[path] = URL.createObjectURL(blob);
+            }
+        }
 
         const content = JSON.stringify(manifest, null, 2);
         const blob = new Blob([content], { type: 'application/json' });
@@ -391,7 +366,7 @@ export async function handleExportManifest() {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        // Note: URLs created here are temporary and will be revoked. This manifest is for immediate use.
         logPersistence('Manifest exported successfully.');
     } catch (e) {
         logPersistence(`Manifest export failed: ${(e as Error).message}`);
@@ -406,13 +381,13 @@ export function handleMetaLoad(file: File) {
             const content = e.target?.result as string;
             await loadFromSerialized(content);
             logPersistence('State imported successfully. UI will now update.');
-            renderAllChatMessages();
-            renderFileTree();
-            renderAssetManager();
-            renderCaraHud();
-            renderKernelHud();
-            renderMetisHud();
-            await switchFile(appState.activeFile?.name || '0index.html');
+            await renderAllChatMessages();
+            await renderFileTree();
+            await renderAssetManager();
+            await renderCaraHud();
+            await renderKernelHud();
+            await renderMetisHud();
+            await switchFile(appState.activeFilePath || '0index.html');
             await switchTab(appState.currentActiveTabId);
         } catch (err) {
             logPersistence(`Import failed: ${(err as Error).message}`);

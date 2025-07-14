@@ -49,6 +49,14 @@ export const caraBootstrapSelect = getElem<HTMLSelectElement>('cara-bootstrap-se
 // Search Tab Elements
 export const searchTabPane = getElem<HTMLElement>('search-tab');
 
+// VFS Shell Elements
+export const vfsShellTab = getElem<HTMLElement>('vfs-shell-tab');
+export const vfsShellOutput = getElem<HTMLElement>('vfs-shell-output');
+export const vfsShellInput = getElem<HTMLInputElement>('vfs-shell-input');
+export const vfsViEditorOverlay = getElem<HTMLElement>('vfs-vi-editor-overlay');
+export const vfsViFilename = getElem<HTMLElement>('vfs-vi-filename');
+export const vfsViTextarea = getElem<HTMLTextAreaElement>('vfs-vi-textarea');
+
 // Sidebars
 export const leftSidebar = getElem<HTMLElement>('left-sidebar');
 export const rightSidebar = getElem<HTMLElement>('right-sidebar');

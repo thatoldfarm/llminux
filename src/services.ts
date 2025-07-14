@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -5,11 +6,11 @@
 
 import { GoogleGenAI, Type } from "https://esm.run/@google/genai";
 import { appState, LIA_BOOTSTRAP_FILENAME, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, METIS_SYSTEM_PROMPT_FILENAME, PUPA_SYSTEM_PROMPT_FILENAME } from './state';
-import { StateDefinition, LiaState, ChatMessage, LiaUtilityDefinition, LiaUtilityCommand, LiaUtilitiesConfig, DefaultFile } from './types';
-import { getFileContent, updateAndSaveVFS } from './vfs';
-import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud, renderMetisChatModal, renderPupaChatModal } from './ui';
-import { saveStateToLocalStorage, getSerializableStateObject } from "./persistence";
-import { getMimeType, scrollToBottom } from "./utils";
+import { StateDefinition, LiaState, ChatMessage, LiaUtilityDefinition, LiaUtilityCommand, LiaUtilitiesConfig } from './types';
+import { getFileContentAsText, saveFileToVFS, deleteFileFromVFS } from './vfs';
+import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud, renderMetisChatModal, renderPupaChatModal, renderFileTree, renderEditorTab } from './ui';
+import { saveStateToLocalStorage } from "./persistence";
+import { scrollToBottom } from "./utils";
 import * as dom from './dom';
 
 let ai: GoogleGenAI;
@@ -18,11 +19,11 @@ export function setAiInstance(instance: GoogleGenAI) {
     ai = instance;
 }
 
-export function getAllStatesFromBootstrap(): StateDefinition[] {
+export async function getAllStatesFromBootstrap(): Promise<StateDefinition[]> {
     try {
-        const bootstrapFileContent = getFileContent(LIA_BOOTSTRAP_FILENAME);
-        if (!bootstrapFileContent) {
-            console.error("Bootstrap file not found in VFS. Cannot get states.");
+        const bootstrapFileContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+        if (!bootstrapFileContent || typeof bootstrapFileContent !== 'string') {
+            console.error("Bootstrap file not found or is not a string in VFS. Cannot get states.");
             return [];
         }
         
@@ -45,9 +46,9 @@ export function getAllStatesFromBootstrap(): StateDefinition[] {
     }
 }
 
-export function resetLiaState() {
+export async function resetLiaState() {
     const newLiaState: LiaState = {};
-    const allStates = getAllStatesFromBootstrap();
+    const allStates = await getAllStatesFromBootstrap();
 
     if (allStates.length > 0) {
         allStates.forEach(state => {
@@ -191,7 +192,7 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
     try {
         // Handle special `system-stress-test` command directly
         if (userPrompt.startsWith('system-stress-test')) {
-            const allStates = getAllStatesFromBootstrap();
+            const allStates = await getAllStatesFromBootstrap();
             const newState = { ...appState.liaState };
             const overrides = userPrompt.substring('system-stress-test'.length).trim().split(/\s+/).filter(p => p);
             let overrideCount = 0;
@@ -270,14 +271,14 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
             }
         }
 
-        const bootstrapContent = getFileContent(LIA_BOOTSTRAP_FILENAME);
-        if (!bootstrapContent) throw new Error("LIA Bootstrap file not loaded.");
+        const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+        if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or is not text.");
         const bootstrap = JSON.parse(bootstrapContent);
         
         let systemPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.LIA_OS?.prompt_template;
         if (!systemPromptTemplate) throw new Error("LIA_OS prompt template not found in bootstrap.");
         
-        const allStates = getAllStatesFromBootstrap();
+        const allStates = await getAllStatesFromBootstrap();
         if (allStates.length === 0) throw new Error("Could not load LIA state definitions from bootstrap file.");
 
         const operator = document.querySelector<HTMLSelectElement>('#lia-operator-select')?.value || 'Send';
@@ -343,15 +344,16 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
 
 export async function processLiaAssistantResponse(history: ChatMessage[], thinkingBubble: HTMLElement) {
     try {
-        const bootstrapContent = getFileContent(LIA_BOOTSTRAP_FILENAME);
-        if (!bootstrapContent) throw new Error("LIA Bootstrap file not loaded.");
+        const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+        if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or is not text.");
         const bootstrap = JSON.parse(bootstrapContent);
         
         let systemPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.LIA_Assistant_ReadOnly?.prompt_template;
         if (!systemPromptTemplate) throw new Error("LIA_Assistant_ReadOnly prompt template not found.");
 
         const userPrompt = history[history.length - 1].parts[0].text;
-        const stateString = getAllStatesFromBootstrap().map(s => `${s.name}: ${typeof appState.liaState[s.id] === 'number' ? (appState.liaState[s.id] as number).toFixed(3) : appState.liaState[s.id]}`).join('\\n');
+        const allStates = await getAllStatesFromBootstrap();
+        const stateString = allStates.map(s => `${s.name}: ${typeof appState.liaState[s.id] === 'number' ? (appState.liaState[s.id] as number).toFixed(3) : appState.liaState[s.id]}`).join('\\n');
 
         const systemInstruction = systemPromptTemplate
             .replace('%%STATE_STRING%%', stateString)
@@ -372,18 +374,18 @@ export async function processLiaAssistantResponse(history: ChatMessage[], thinki
 
 export async function processCodeAssistantResponse(history: ChatMessage[], thinkingBubble: HTMLElement) {
      try {
-        const bootstrapContent = getFileContent(LIA_BOOTSTRAP_FILENAME);
-        if (!bootstrapContent) throw new Error("LIA Bootstrap file not loaded.");
+        const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+        if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or not text.");
         const bootstrap = JSON.parse(bootstrapContent);
         
         let systemPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.Code_Assistant_Generic?.prompt_template;
         if (!systemPromptTemplate) throw new Error("Code_Assistant_Generic prompt template not found.");
 
-        const activeFile = appState.activeFile;
+        const activeFileContent = appState.activeFilePath ? await getFileContentAsText(appState.activeFilePath) : 'No file is active.';
 
         const systemInstruction = systemPromptTemplate
-            .replace('%%ACTIVE_FILE_NAME%%', activeFile?.name || 'None')
-            .replace('%%ACTIVE_FILE_CONTENT%%', activeFile?.content || 'No file is active.');
+            .replace('%%ACTIVE_FILE_NAME%%', appState.activeFilePath || 'None')
+            .replace('%%ACTIVE_FILE_CONTENT%%', activeFileContent ?? '[Binary Content]');
 
         const apiHistory = history.filter(m => m.role === 'user' || m.role === 'model');
         const response = await ai.models.generateContent({ model: appState.aiSettings.model, contents: apiHistory, config: { systemInstruction, ...appState.aiSettings } });
@@ -415,15 +417,19 @@ export async function processVanillaChatResponse(history: ChatMessage[], thinkin
 
 export async function processFsUtilResponse(history: ChatMessage[], thinkingBubble: HTMLElement) {
     try {
-        const bootstrapContent = getFileContent(LIA_BOOTSTRAP_FILENAME);
-        if (!bootstrapContent) throw new Error("LIA Bootstrap file not loaded.");
+        const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+        if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or not text.");
         const bootstrap = JSON.parse(bootstrapContent);
         
         const fsUtilPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.Fs_Util?.prompt_template;
         if (!fsUtilPromptTemplate) throw new Error("Fs_Util prompt template not found in bootstrap.");
 
         const userPrompt = history[history.length - 1].parts[0].text;
-        const fileManifest = appState.vfsFiles.map(f => `${f.name} (${f.size} bytes)`).join('\\n');
+        const fileManifest = Object.keys(appState.vfsBlob).map(path => {
+            const content = appState.vfsBlob[path];
+            const size = typeof content === 'string' ? content.length : (content instanceof Blob ? content.size : 0);
+            return `${path} (${size} bytes)`;
+        }).join('\\n');
 
         const systemInstruction = fsUtilPromptTemplate.replace('%%PROMPT%%', userPrompt).replace('%%FILE_MANIFEST%%', fileManifest);
         const schema = { type: Type.OBJECT, properties: { action: { type: Type.STRING, enum: ['system_log', 'update_inode', 'create_inode', 'delete_inode', 'error'] }, inode_path: { type: Type.STRING }, fs_content: { type: Type.STRING } }, required: ['action', 'fs_content']};
@@ -445,33 +451,23 @@ export async function processFsUtilResponse(history: ChatMessage[], thinkingBubb
                 const isCreating = result.action === 'create_inode';
                 const fileName = result.inode_path;
                 const content = result.fs_content;
-                const fileIndex = appState.vfsFiles.findIndex(f => f.name === fileName);
                 
-                if ((isCreating && fileIndex > -1) || (!isCreating && fileIndex === -1)) {
+                if ((isCreating && appState.vfsBlob[fileName] !== undefined) || (!isCreating && appState.vfsBlob[fileName] === undefined)) {
                     narrative = `Fs_Util Error: File '${fileName}' ${isCreating ? 'already exists' : 'not found'}. Use ${isCreating ? 'update' : 'create'} action.`;
                     break;
                 }
-                const mimeType = getMimeType(fileName);
-                const blob = new Blob([content], { type: mimeType });
-                
-                if (fileIndex > -1) {
-                    URL.revokeObjectURL(appState.vfsFiles[fileIndex].url);
-                    Object.assign(appState.vfsFiles[fileIndex], { content, raw: blob, url: URL.createObjectURL(blob), size: blob.size });
-                } else {
-                    appState.vfsFiles.push({ name: fileName, content, raw: blob, url: URL.createObjectURL(blob), type: mimeType, size: blob.size });
-                }
-                updateAndSaveVFS(appState.vfsFiles);
+                saveFileToVFS(fileName, content);
+                renderFileTree();
+                renderEditorTab();
                 narrative = `${isCreating ? 'Created' : 'Updated'} inode: ${fileName}`;
                 break;
             }
             case 'delete_inode': {
                 const fileName = result.inode_path;
-                const fileIndex = appState.vfsFiles.findIndex(f => f.name === fileName);
-                if (fileIndex > -1) {
-                    URL.revokeObjectURL(appState.vfsFiles[fileIndex].url);
-                    appState.vfsFiles.splice(fileIndex, 1);
+                if (deleteFileFromVFS(fileName)) {
                     narrative = `Deleted inode: ${fileName}`;
-                    updateAndSaveVFS(appState.vfsFiles);
+                    renderFileTree();
+                    renderEditorTab();
                 } else {
                      narrative = `Fs_Util Error: File '${fileName}' not found for deletion.`;
                 }
@@ -490,11 +486,11 @@ export async function processFsUtilResponse(history: ChatMessage[], thinkingBubb
 }
 
 async function processCaraUnevolved(history: ChatMessage[]) {
-    const bootstrapJsonContent = getFileContent(appState.caraState.activeBootstrapFile);
-    if (!bootstrapJsonContent) throw new Error(`Cara's bootstrap file '${appState.caraState.activeBootstrapFile}' not loaded.`);
+    const bootstrapJsonContent = await getFileContentAsText(appState.caraState.activeBootstrapFile);
+    if (!bootstrapJsonContent || typeof bootstrapJsonContent !== 'string') throw new Error(`Cara's bootstrap file '${appState.caraState.activeBootstrapFile}' not loaded or not text.`);
 
-    let systemPromptTemplate = getFileContent(CARA_SYSTEM_PROMPT_FILENAME);
-    if (!systemPromptTemplate) throw new Error("Cara's system prompt not found.");
+    let systemPromptTemplate = await getFileContentAsText(CARA_SYSTEM_PROMPT_FILENAME);
+    if (!systemPromptTemplate || typeof systemPromptTemplate !== 'string') throw new Error("Cara's system prompt not found or not text.");
 
     const userPrompt = history[history.length - 1].parts[0].text;
     
@@ -717,8 +713,8 @@ function getLeanCaraState() {
 
 export async function processMetisMonologue(thinkingBubble: HTMLElement) {
     try {
-        const systemPromptTemplate = getFileContent(METIS_SYSTEM_PROMPT_FILENAME);
-        if (!systemPromptTemplate) throw new Error("Metis system prompt not loaded.");
+        const systemPromptTemplate = await getFileContentAsText(METIS_SYSTEM_PROMPT_FILENAME);
+        if (!systemPromptTemplate || typeof systemPromptTemplate !== 'string') throw new Error("Metis system prompt not loaded.");
 
         const leanCaraState = getLeanCaraState();
 
@@ -729,7 +725,7 @@ export async function processMetisMonologue(thinkingBubble: HTMLElement) {
 
         const response = await ai.models.generateContent({
             model: appState.aiSettings.model,
-            contents: appState.lastUserAction,
+            contents: [{role: 'user', parts: [{ text: appState.lastUserAction }]}],
             config: { systemInstruction, ...appState.aiSettings }
         });
 
@@ -748,8 +744,8 @@ export async function processMetisMonologue(thinkingBubble: HTMLElement) {
 
 export async function processPupaMonologue(thinkingBubble: HTMLElement) {
     try {
-        const systemPromptTemplate = getFileContent(PUPA_SYSTEM_PROMPT_FILENAME);
-        if (!systemPromptTemplate) throw new Error("Pupa system prompt not loaded.");
+        const systemPromptTemplate = await getFileContentAsText(PUPA_SYSTEM_PROMPT_FILENAME);
+        if (!systemPromptTemplate || typeof systemPromptTemplate !== 'string') throw new Error("Pupa system prompt not loaded.");
 
         const leanCaraState = getLeanCaraState();
 
@@ -760,7 +756,7 @@ export async function processPupaMonologue(thinkingBubble: HTMLElement) {
 
         const response = await ai.models.generateContent({
             model: appState.aiSettings.model,
-            contents: appState.lastUserAction,
+            contents: [{role: 'user', parts: [{ text: appState.lastUserAction }]}],
             config: { systemInstruction, ...appState.aiSettings }
         });
 
@@ -786,19 +782,19 @@ export async function handleProtocolSend(history: ChatMessage[], thinkingBubble:
     (appState as any)[loadingKey] = true;
 
     try {
-        let systemPromptTemplate = getFileContent(config.promptFile);
-        if (!systemPromptTemplate) throw new Error(`System prompt file not found: ${config.promptFile}`);
+        let systemPromptTemplate = await getFileContentAsText(config.promptFile);
+        if (!systemPromptTemplate || typeof systemPromptTemplate !== 'string') throw new Error(`System prompt file not found: ${config.promptFile}`);
 
         let finalSystemInstruction = systemPromptTemplate.replace(/%%OPERATOR%%/g, operator)
                                             .replace(/%%PROMPT%%/g, userPrompt)
-                                            .replace(/%%FILE_MANIFEST%%/g, appState.vfsFiles.map(f => f.name).join('\\n'));
+                                            .replace(/%%FILE_MANIFEST%%/g, Object.keys(appState.vfsBlob).join('\\n'));
 
         if (protocol === 'help') {
             const uiCommands = appState.commandPaletteCommands.map(c => `- ${c.name} (${c.section})`).join('\\n');
-            const legendFile = getFileContent(LIA_COMMAND_LEGEND_FILENAME);
-            const legendCommands = legendFile ? JSON.stringify(JSON.parse(legendFile).categories, null, 2) : 'Not available.';
-            const linuxFile = getFileContent(LIA_LINUX_COMMANDS_FILENAME);
-            const linuxCommands = linuxFile ? JSON.stringify(JSON.parse(linuxFile).command_list, null, 2) : 'Not available.';
+            const legendFile = await getFileContentAsText(LIA_COMMAND_LEGEND_FILENAME);
+            const legendCommands = (legendFile && typeof legendFile === 'string') ? JSON.stringify(JSON.parse(legendFile).categories, null, 2) : 'Not available.';
+            const linuxFile = await getFileContentAsText(LIA_LINUX_COMMANDS_FILENAME);
+            const linuxCommands = (linuxFile && typeof linuxFile === 'string') ? JSON.stringify(JSON.parse(linuxFile).command_list, null, 2) : 'Not available.';
 
             finalSystemInstruction = finalSystemInstruction
                 .replace('%%UI_COMMANDS%%', uiCommands)
@@ -834,37 +830,23 @@ export async function handleProtocolSend(history: ChatMessage[], thinkingBubble:
                 const verb = result.action === 'create_file' ? 'created' : 'updated';
                 const fileName = result.file_name;
                 const content = Array.isArray(result.content) ? result.content.join('\\n') : result.content;
-                const fileIndex = appState.vfsFiles.findIndex(f => f.name === fileName);
-                const mimeType = getMimeType(fileName);
-                const blob = new Blob([content], { type: mimeType });
-                
-                if (fileIndex > -1) {
-                    URL.revokeObjectURL(appState.vfsFiles[fileIndex].url);
-                    Object.assign(appState.vfsFiles[fileIndex], { content, raw: blob, url: URL.createObjectURL(blob), size: blob.size });
-                } else {
-                    appState.vfsFiles.push({ name: fileName, content, raw: blob, url: URL.createObjectURL(blob), type: mimeType, size: blob.size });
-                }
-                updateAndSaveVFS(appState.vfsFiles);
+                saveFileToVFS(fileName, content);
+                renderFileTree();
+                renderEditorTab();
                 const fileActionText = `File '${fileName}' has been ${verb}. You can view it in the file explorer.`;
                 (appState[historyKey] as ChatMessage[]).push({ role: 'model', parts: [{ text: fileActionText }] });
                 thinkingBubble.replaceWith(createChatBubble('model', fileActionText));
             } else if (result.action === 'create_sandbox') {
-                 const sandboxFiles: DefaultFile[] = [
+                 const sandboxFiles = [
                     { name: 'sandbox/index.html', content: `<h1>Sandbox</h1><p>This is a safe, isolated environment.</p><script src="script.js"><\/script>` },
                     { name: 'sandbox/style.css', content: `body { background-color: #282a36; color: #f8f8f2; }` },
                     { name: 'sandbox/script.js', content: `console.log('Hello from the sandbox!');` }
                 ];
                 for (const file of sandboxFiles) {
-                    const mimeType = getMimeType(file.name);
-                    const blob = new Blob([file.content], { type: mimeType });
-                    const fileIndex = appState.vfsFiles.findIndex(f => f.name === file.name);
-                    if (fileIndex > -1) {
-                        Object.assign(appState.vfsFiles[fileIndex], { content: file.content, raw: blob, url: URL.createObjectURL(blob), size: blob.size });
-                    } else {
-                        appState.vfsFiles.push({ name: file.name, content: file.content, raw: blob, url: URL.createObjectURL(blob), type: mimeType, size: blob.size });
-                    }
+                    saveFileToVFS(file.name, file.content);
                 }
-                updateAndSaveVFS(appState.vfsFiles);
+                renderFileTree();
+                renderEditorTab();
                 const sandboxText = result.content || `Sandbox environment provisioned successfully in the 'sandbox/' directory.`;
                 (appState[historyKey] as ChatMessage[]).push({ role: 'model', parts: [{ text: sandboxText }] });
                 thinkingBubble.replaceWith(createChatBubble('model', sandboxText));

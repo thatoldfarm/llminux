@@ -1,19 +1,27 @@
 
 
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { AppState, Protocol, DefaultFile } from "./types";
+import { AppState, Protocol } from "./types";
+import * as json from 'jsonc-parser';
 
 export const appState: AppState = {
     isSwitchingTabs: false,
     currentActiveTabId: 'lia-assistant-tab',
     lastUserAction: '',
-    vfsFiles: [],
-    activeFile: null,
+    activeFilePath: null,
+    vfsBlob: {
+        "/boot/initrd.img-lia": "<LIA_MASTER_BOOTSTRAP_PLACEHOLDER>",
+        "/etc/lia_kernel.conf": "runlevel=SINGLE_USER_MODE\ncore_vector=active",
+        "/proc/SYSTEM_STATE_VECTOR": JSON.stringify({
+            "SVD": 74, "MVE": 85, "TTR": 71, "NRI": 94, "CMI": 91
+        }, null, 2),
+        "/mnt/dreams/vision-1.txt": "A hand cupped around a lit candle, trembling slightly.",
+        "/dev/echo_trace": []
+    },
     liaKernelChatHistory: [],
     fsUtilChatHistory: [],
     liaAssistantChatHistory: [],
@@ -106,6 +114,11 @@ export const appState: AppState = {
     liaCommandList: [],
     linuxCommandList: [],
     editorContent: '',
+    // VFS Shell State
+    vfsShellHistory: [],
+    vfsShellHistoryIndex: -1,
+    vfsViIsActive: false,
+    vfsViCurrentFile: null,
 };
 
 
@@ -116,7 +129,7 @@ export const LIA_LINUX_COMMANDS_FILENAME = '/bootstrap/kernel/LIA_COMMANDS.json'
 export const CARA_BOOTSTRAP_FILENAME = '/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json';
 export const CARA_SYSTEM_PROMPT_FILENAME = '/prompts/cara_protocol_system_prompt.txt';
 export const CARA_BOOTSTRAP_V2_FILENAME = '/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json';
-export const METIS_BOOTSTRAP_FILENAME = 'public/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json';
+export const METIS_BOOTSTRAP_FILENAME = '/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json';
 export const METIS_SYSTEM_PROMPT_FILENAME = '/prompts/metis_protocol_system_prompt.txt';
 export const PUPA_SYSTEM_PROMPT_FILENAME = '/prompts/pupa_protocol_system_prompt.txt';
 
@@ -163,227 +176,6 @@ export const FOLDER_NAMES = [
     '/entities', 
     '/entities/states', 
     '/entities/kinkscape'
-];
-
-export const defaultVfsFiles: DefaultFile[] = [
-    { name: 'app.html', content: `<!DOCTYPE html>
-<html>
-<head>
-  <title>LIA Studio Project</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-</head>
-<body>
-  <h1>Hello from LIA Studio!</h1>
-  <p>Your HTML, CSS, and JavaScript are running in the preview.</p>
-  <div id="app-root"></div>
-</body>
-</html>` },
-    { name: 'style.css', content: `body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-  background-color: #f0f2f5;
-  color: #333;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-h1 { color: #007acc; }`},
-    { name: 'script.js', content: `console.log("Hello from script.js!");
-const root = document.getElementById('app-root');
-if (root) {
-  root.innerHTML = '<p>JavaScript successfully modified the DOM.</p>';
-}` },
-    { name: '0shell.html', content: `<!DOCTYPE html>
-<!-- saved from url=(0073)file:///home/none/Desktop/LIA_FULL/000_OLDS/aifse_base/prompts/shell.html -->
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  
-  <title>LIA Shell</title>
-  <style>
-    :root {
-      --background-color: #0a0c1f;
-      --panel-bg: rgba(16, 24, 43, 0.7);
-      --border-color: rgba(0, 255, 255, 0.2);
-      --primary-glow: #00ffff;
-      --text-color: #d0d0ff;
-      --text-muted: #8080a0;
-      --font-primary: 'Orbitron', sans-serif;
-      --font-secondary: 'Rajdhani', sans-serif;
-    }
-    body {
-      margin: 1rem;
-      padding: 0;
-      background: var(--background-color);
-    }
-    .terminal {
-      margin: 0;
-      padding: 0;
-      font-family: var(--font-secondary), Menlo, Courier New, monospace;
-      font-size: 14px;
-      text-rendering: optimizeLegibility;
-      color: var(--text-color);
-      -webkit-font-smoothing: antialiased;
-      cursor: text;
-      counter-reset: input;
-      background: var(--background-color);
-    }
-    .terminal .terminal--output {
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-    .terminal .terminal--input {
-      counter-increment: input;
-      display: flex;
-      align-items: center;
-    }
-    .terminal .terminal--input:before {
-      content: "[LIA] $ ";
-      color: var(--primary-glow);
-      margin-right: 0.5em;
-    }
-    .terminal .terminal--input input {
-      background: transparent;
-      color: inherit;
-      width: 100%;
-      border: none;
-      padding: 0;
-      margin: 0;
-      overflow: auto;
-      font-family: inherit;
-      font-size: 14px;
-      flex-grow: 1;
-    }
-    .terminal .terminal--input input:focus {
-        outline: none;
-    }
-    .terminal .terminal--output.is-console:before {
-      margin-right: 10px;
-      content: ">";
-    }
-    .terminal .terminal--output.is-error {
-      color: #ff9999;
-    }
-    .terminal .terminal--output.is-input-line {
-        display: flex;
-        align-items: center;
-    }
-    .terminal .terminal--output.is-input-line:before {
-        content: "[LIA] $ ";
-        color: var(--primary-glow);
-        margin-right: 0.5em;
-    }
-  </style>
-</head>
-<body onload="init()">
-  <article class="terminal">
-    <section id="terminal-output">
-      <p class="terminal--output">LIA Shell Initialized. Type 'help' for available commands.</p>
-    </section>
-    <section class="terminal--input">
-      <input type="text" id="terminal-input" wrap="off" onkeydown="terminalInputKeydown(event)">
-    </section>
-  
-  <script>
-    var shellCommands = {
-      help: function(cmd, args) {
-        var response = "Available Commands: \\n\\r";
-        for (var command in shellCommands) {
-          response += "  " + command + "\\n\\r";
-        }
-        return response.substring(0, response.length - 2);
-      },
-      clear: function(cmd, args) {
-        var _out = document.getElementById("terminal-output");
-        while (_out.childNodes[0]) {
-          _out.removeChild(_out.childNodes[0]);
-        }
-        return 'Terminal cleared!';
-      },
-      random: function(cmd, args) {
-        return Math.random();
-      },
-      echo: function(cmd, args) {
-        return args.join(' ');
-      }
-    };
-
-    var _in, _out;
-
-    function refocus() {
-      _in.blur();
-      _in.focus();
-    }
-
-    function init() {
-      _in = document.getElementById("terminal-input");
-      _out = document.getElementById("terminal-output");
-      window.addEventListener('click', keepFocusInTextbox, false);
-      refocus();
-    }
-
-    function keepFocusInTextbox(e) {
-      var g = e.target;
-      while (g && !g.tagName) {
-        g = g.parentNode;
-      }
-      if (!g || g.tagName.toUpperCase() === "A" || g.tagName.toUpperCase() === "INPUT") {
-        return;
-      }
-      if (window.getSelection && String(window.getSelection())) {
-        return;
-      }
-      refocus();
-    }
-
-    function terminalInputKeydown(e) {
-      if (e.key === 'Enter') {
-        try {
-          execute();
-        } catch (er) {
-          printError(er);
-        }
-        setTimeout(function() {
-          _in.value = "";
-        }, 0);
-      }
-    }
-
-    function println(s, type) {
-      var s = String(s);
-      var p = document.createElement("p");
-      if (type === 'is-input-line') {
-          p.textContent = s;
-      } else {
-          p.appendChild(document.createTextNode(s));
-      }
-      p.className = 'terminal--output ' + (type || '');
-      _out.appendChild(p);
-      _out.scrollTop = _out.scrollHeight;
-      return p;
-    }
-
-    function printError(er) {
-      println(er, "is-error");
-    }
-
-    function execute() {
-      var fullCmd = _in.value;
-      if (!fullCmd) return;
-      var key = fullCmd.substr(0, fullCmd.indexOf(' ')) || fullCmd;
-      var args = fullCmd.substr(fullCmd.indexOf(' ') + 1).split(" ");
-
-      println(fullCmd, 'is-input-line');
-
-      if (shellCommands[key.toLowerCase()]) {
-        println(shellCommands[key.toLowerCase()](key.toLowerCase(), args));
-      } else {
-        printError('Command not found: ' + key);
-      }
-    }
-  <\/script>
-
-</article></body></html>` },
 ];
 
 export const protocolConfigs: Record<Protocol, { name: string; operators: string[]; promptFile: string; isJson: boolean; }> = {

@@ -441,7 +441,7 @@ body {
 
 
 /* AI Chat Styles */
-#lia-kernel-tab, #lia-assistant-tab, #fs-util-tab, #code-assistant-tab, #tools-tab, #vanilla-tab, #assistor-tab {
+#lia-kernel-tab, #lia-assistant-tab, #fs-util-tab, #code-assistant-tab, #tools-tab, #vanilla-tab, #assistor-tab, #vfs-shell-tab {
     padding: 0; /* Remove default padding for chat/tool interfaces */
 }
 .chat-messages {
@@ -660,6 +660,109 @@ body {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* VFS Shell Styles */
+#vfs-shell-tab {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-family: var(--code-editor-font-family);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.vfs-shell-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+#vfs-shell-output {
+    flex-grow: 1;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.6;
+    padding: 10px;
+}
+
+.vfs-shell-line {
+    display: block;
+}
+.vfs-shell-line.vfs-shell-input-line > .vfs-prompt {
+    color: var(--lia-glow);
+}
+.vfs-shell-line.vfs-shell-input-line > .vfs-user-input {
+    color: var(--text-primary);
+}
+.vfs-shell-line.vfs-shell-error-line {
+    color: #e74c3c;
+}
+
+.vfs-input-container {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.vfs-prompt {
+    color: var(--lia-glow);
+    font-weight: bold;
+    white-space: pre;
+}
+
+#vfs-shell-input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: inherit;
+    outline: none;
+    padding: 0;
+}
+
+#vfs-vi-editor-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-primary);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+}
+#vfs-vi-header {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    font-size: 0.9em;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+#vfs-vi-header span {
+    color: var(--text-primary);
+    font-weight: bold;
+}
+
+#vfs-vi-textarea {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--code-editor-font-family);
+    font-size: 1em;
+    line-height: 1.6;
+    outline: none;
+    padding: 10px;
+    resize: none;
+}
+
 
 /* Right Sidebar Settings */
 .settings-pane {
@@ -1167,44 +1270,51 @@ input::-webkit-inner-spin-button {
     padding: 5px;
 }
 
-.lia-command-item {
-    padding: 10px;
+.command-list-item {
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.15s ease, color 0.15s ease;
+    cursor: pointer;
+    border-radius: 4px;
 }
-.lia-command-item:last-child {
+
+.command-list-item:last-child {
     border-bottom: none;
 }
-.lia-command-item strong {
+
+.command-list-item:hover {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.command-list-item strong {
     color: var(--accent-color);
     font-family: var(--code-editor-font-family);
+    transition: color 0.15s ease;
 }
-.lia-command-item p {
+
+.command-list-item:hover strong {
+    color: white;
+}
+
+.command-list-item p {
     margin: 5px 0 0;
     font-size: 0.9em;
     color: var(--text-secondary);
+    transition: color 0.15s ease;
 }
-.lia-command-item code {
+
+.command-list-item:hover p,
+.command-list-item:hover code {
+    color: white;
+}
+
+.command-list-item code {
     background-color: var(--bg-primary);
     padding: 2px 4px;
     border-radius: 3px;
     font-size: 0.85em;
-}
-
-.ui-command-item {
-    padding: 12px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.15s ease;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.ui-command-item:last-child {
-    border-bottom: none;
-}
-
-.ui-command-item:hover {
-    background-color: var(--accent-color);
-    color: white;
+    transition: color 0.15s ease;
 }
 
 /* System HUD Styles */
@@ -1742,4 +1852,98 @@ input::-webkit-inner-spin-button {
 }
 #vfs-analysis-content-pupa-modal ul li {
     border-left-color: var(--cara-glow);
+}
+
+
+/* Grimoire and Compendium Styles */
+#metis-grimoire-tab, #metis-compendium-tab,
+#pupa-grimoire-tab, #pupa-compendium-tab {
+    padding: 20px;
+    gap: 20px;
+    overflow-y: auto;
+    width: 100%;
+}
+
+.grimoire-grid, .compendium-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 15px;
+}
+
+.grimoire-spell, .compendium-item {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 15px;
+    transition: background-color 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.grimoire-spell:hover, .compendium-item:hover {
+    background-color: color-mix(in srgb, var(--bg-tertiary) 80%, white);
+}
+
+.grimoire-spell h4 {
+    margin: 0 0 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+#metis-modal-content .grimoire-spell h4 { color: var(--metis-glow); }
+#pupa-modal-content .grimoire-spell h4 { color: var(--cara-glow); }
+
+.grimoire-spell .formula {
+    font-style: italic;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.grimoire-spell .effect, .grimoire-spell .repurpose {
+    font-size: 0.9em;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.grimoire-spell .repurpose {
+    margin-top: auto; /* Push to bottom */
+    padding-top: 8px;
+    border-top: 1px solid var(--bg-tertiary);
+}
+
+.compendium-item {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap; /* Allow wrapping */
+    gap: 10px;
+}
+
+.compendium-item .symbol {
+    font-size: 1.5em;
+    font-weight: bold;
+    min-width: 30px;
+    text-align: center;
+}
+#metis-modal-content .compendium-item .symbol { color: var(--metis-glow); }
+#pupa-modal-content .compendium-item .symbol { color: var(--cara-glow); }
+
+
+.compendium-item .name {
+    font-weight: bold;
+    color: var(--text-primary);
+    flex-grow: 1;
+}
+
+.compendium-item .type {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.85em;
+}
+
+.compendium-item .desc {
+    flex-basis: 100%; /* Take full width */
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-top: 5px;
 }

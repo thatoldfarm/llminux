@@ -5,10 +5,10 @@
 
 import * as dom from './dom';
 import { appState, CRITICAL_SYSTEM_FILES } from './state';
-import { ChatMessage, FileBlob, Command } from './types';
+import { ChatMessage, Command } from './types';
 import { autoExpandTextarea, getMimeType, formatBytes, scrollToBottom } from './utils';
-import { switchFile, updateActiveFileContent, updateAndSaveVFS } from './vfs';
-import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud, renderMetisModal, createChatBubble, renderPupaModal } from './ui';
+import { updateActiveFileContent, processVfsShellCommand, saveAndExitViMode, quitViMode, getFileContentAsText, saveFileToVFS, getFileContentAsBlob, switchFile } from './vfs';
+import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud, renderMetisModal, createChatBubble, renderPupaModal, renderVfsShellEntry } from './ui';
 import { processLiaKernelResponse, processLiaAssistantResponse, processCodeAssistantResponse, processFsUtilResponse, resetLiaState, processVanillaChatResponse, handleProtocolSend, processCaraResponse, processMetisMonologue, processPupaMonologue } from './services';
 import { handleMetaExport, handleMetaLoad, handleDirectSave, handleDirectLoad, handleClearAndReset, handleExportManifest, handleClearLog, saveStateToLocalStorage, logPersistence } from './persistence';
 
@@ -108,6 +108,7 @@ async function handleSendPupaMonologue() {
 export function initializeCommands() {
     appState.commandPaletteCommands = [
         { id: 'tab-lia-assistant', name: 'View: LIA Helper', section: 'Navigation', action: () => switchTab('lia-assistant-tab') },
+        { id: 'tab-vfs-shell', name: 'View: VFS Shell', section: 'Navigation', action: () => switchTab('vfs-shell-tab') },
         { id: 'tab-code-assistant', name: 'View: Code Helper', section: 'Navigation', action: () => switchTab('code-assistant-tab') },
         { id: 'tab-vanilla', name: 'View: Vanilla', section: 'Navigation', action: () => switchTab('vanilla-tab') },
         { id: 'tab-search', name: 'View: Commands', section: 'Navigation', action: () => switchTab('search-tab') },
@@ -122,7 +123,7 @@ export function initializeCommands() {
         { id: 'tab-editor', name: 'View: Editor', section: 'Navigation', action: () => switchTab('editor-tab') },
         { id: 'toggle-left-sidebar', name: 'Toggle: Left Sidebar', section: 'UI', action: () => dom.leftSidebar?.classList.toggle('collapsed') },
         { id: 'toggle-right-sidebar', name: 'Toggle: Right Sidebar', section: 'UI', action: () => dom.rightSidebar?.classList.toggle('collapsed') },
-        { id: 'toggle-kernel-hud', name: 'Toggle: Kernel HUD', section: 'UI', action: () => { appState.kernelHudVisible = !appState.kernelHudVisible; renderKernelHud(); } },
+        { id: 'toggle-kernel-hud', name: 'Toggle: Kernel HUD', section: 'UI', action: async () => { appState.kernelHudVisible = !appState.kernelHudVisible; await renderKernelHud(); } },
         { id: 'toggle-cara-hud', name: 'Toggle: Cara HUD', section: 'UI', action: () => { appState.caraState.hudVisible = !appState.caraState.hudVisible; renderCaraHud(); } },
         { id: 'toggle-metis-hud', name: 'Toggle: Metis HUD', section: 'UI', action: () => { appState.metisHudVisible = !appState.metisHudVisible; renderMetisHud(); } },
         { id: 'launch-metis-portal', name: 'Launch Metis Portal', section: 'UI', action: () => dom.launchMetisPortalButton?.click() },
@@ -131,7 +132,7 @@ export function initializeCommands() {
         { id: 'load-browser', name: 'Persist: Load from Browser', section: 'Persistence', action: handleDirectLoad },
         { id: 'export-state', name: 'Persist: Export State to File', section: 'Persistence', action: handleMetaExport },
         { id: 'import-state', name: 'Persist: Import State from File', section: 'Persistence', action: () => dom.metaLoadInput?.click() },
-        { id: 'reset-lia', name: 'System: Reset LIA State', section: 'System', action: resetLiaState },
+        { id: 'reset-lia', name: 'System: Reset LIA State', section: 'System', action: async () => { await resetLiaState(); await renderSystemState(false); renderCaraHud(); await renderKernelHud(); } },
         { id: 'reset-app', name: 'System: Clear & Reset Application', section: 'System', keywords: 'delete wipe hard reset', action: handleClearAndReset },
     ];
 }
@@ -163,7 +164,6 @@ function setupModalEventListeners(modalType: 'metis' | 'pupa') {
     });
 }
 
-
 export function initializeEventListeners() {
     dom.toggleSidebarButton?.addEventListener('click', () => {
         dom.leftSidebar?.classList.toggle('collapsed')
@@ -171,9 +171,9 @@ export function initializeEventListeners() {
     dom.toggleRightSidebarButton?.addEventListener('click', () => dom.rightSidebar?.classList.toggle('collapsed'));
     dom.syncStateButton?.addEventListener('click', handleDirectSave);
 
-    dom.toggleKernelHudButton?.addEventListener('click', () => {
+    dom.toggleKernelHudButton?.addEventListener('click', async () => {
         appState.kernelHudVisible = !appState.kernelHudVisible;
-        renderKernelHud();
+        await renderKernelHud();
     });
     dom.toggleCaraHudButton?.addEventListener('click', () => {
         appState.caraState.hudVisible = !appState.caraState.hudVisible;
@@ -288,38 +288,46 @@ export function initializeEventListeners() {
         const fileItem = target.closest<HTMLElement>('.file-item');
         if (!fileItem) return;
         
-        const fileName = fileItem.dataset.fileName;
-        if (!fileName) return;
+        const filePath = fileItem.dataset.fileName;
+        if (!filePath) return;
 
         // Handle action buttons
         if (actionButton) {
             e.stopPropagation(); // Prevent file switching when clicking a button
-            const file = appState.vfsFiles.find(f => f.name === fileName);
-            if (!file) return;
+            const fileContent = await getFileContentAsText(filePath);
+            if (fileContent === undefined) return;
 
-            const action = actionButton.dataset.action;
-            switch(action) {
+            const fileBlob = getFileContentAsBlob(filePath);
+            const fileUrl = fileBlob instanceof Blob ? URL.createObjectURL(fileBlob) : '#';
+
+            switch(actionButton.dataset.action) {
                 case 'copy-content':
-                    navigator.clipboard.writeText(file.content);
+                    navigator.clipboard.writeText(fileContent);
                     break;
                 case 'copy-url':
-                    navigator.clipboard.writeText(file.url);
+                    if (fileUrl !== '#') navigator.clipboard.writeText(fileUrl);
                     break;
                 case 'open-tab':
-                    window.open(file.url, '_blank');
+                    if (fileUrl !== '#') window.open(fileUrl, '_blank');
                     break;
             }
+            // Revoke the temporary URL after a short delay to allow the action to complete
+            setTimeout(() => URL.revokeObjectURL(fileUrl), 100);
             return;
         }
 
         // Handle file selection
-        if (appState.activeFile && dom.codeEditor) {
+        if (appState.activeFilePath && dom.codeEditor) {
             updateActiveFileContent(dom.codeEditor.value);
         }
-        await switchFile(fileName);
+        await switchFile(filePath);
     });
 
-    dom.codeEditor?.addEventListener('input', () => dom.codeEditor && updateActiveFileContent(dom.codeEditor.value));
+    dom.codeEditor?.addEventListener('input', () => {
+        if (dom.codeEditor) {
+            updateActiveFileContent(dom.codeEditor.value);
+        }
+    });
 
     dom.tabNav?.addEventListener('click', async (e) => {
         const target = e.target as HTMLButtonElement;
@@ -328,15 +336,15 @@ export function initializeEventListeners() {
         }
     });
 
-    dom.tabContent?.addEventListener('click', (e) => {
+    dom.tabContent?.addEventListener('click', async (e) => {
         const target = e.target as HTMLElement;
         if (target.id === 'reset-state-button') {
             const button = target as HTMLButtonElement;
             if (button.dataset.confirm === 'true') {
-                resetLiaState();
-                if (appState.currentActiveTabId === 'system-state-tab') renderSystemState(false);
+                await resetLiaState();
+                if (appState.currentActiveTabId === 'system-state-tab') await renderSystemState(false);
                 renderCaraHud();
-                renderKernelHud();
+                await renderKernelHud();
                 button.dataset.confirm = 'false';
                 button.textContent = 'Reset State';
                 button.style.backgroundColor = '';
@@ -501,6 +509,56 @@ export function initializeEventListeners() {
     dom.exportManifestButton?.addEventListener('click', handleExportManifest);
     dom.clearLogButton?.addEventListener('click', handleClearLog);
 
+    dom.vfsShellInput?.addEventListener('keydown', async (e) => {
+        const input = e.target as HTMLInputElement;
+        
+        switch (e.key) {
+            case 'Enter':
+                const command = input.value.trim();
+                input.value = ''; // Clear input immediately
+                if (command) {
+                    appState.vfsShellHistory.push(command);
+                    appState.vfsShellHistoryIndex = appState.vfsShellHistory.length;
+                    const { output, error } = await processVfsShellCommand(command);
+                    renderVfsShellEntry(command, output, error);
+                } else {
+                    renderVfsShellEntry('', '');
+                }
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                if (appState.vfsShellHistoryIndex > 0) {
+                    appState.vfsShellHistoryIndex--;
+                    input.value = appState.vfsShellHistory[appState.vfsShellHistoryIndex];
+                }
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                if (appState.vfsShellHistoryIndex < appState.vfsShellHistory.length - 1) {
+                    appState.vfsShellHistoryIndex++;
+                    input.value = appState.vfsShellHistory[appState.vfsShellHistoryIndex];
+                } else if (appState.vfsShellHistoryIndex === appState.vfsShellHistory.length - 1) {
+                    appState.vfsShellHistoryIndex++;
+                    input.value = '';
+                }
+                break;
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (!appState.vfsViIsActive) return;
+
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === 's') {
+                e.preventDefault();
+                saveAndExitViMode();
+            } else if (e.key === 'q') {
+                e.preventDefault();
+                quitViMode();
+            }
+        }
+    });
+
     const channel = new BroadcastChannel('lia_studio_channel');
     channel.onmessage = (event) => {
         if(event.data.type === 'METIS_PORTAL_READY' || event.data.type === 'PUPA_PORTAL_READY') {
@@ -523,12 +581,17 @@ export function initializeEventListeners() {
         if (event.data?.type === 'LIA_STUDIO_REQUEST_FILES') {
             const iframeSource = Array.from(document.querySelectorAll('iframe')).find(iframe => iframe.contentWindow === event.source);
             if (iframeSource?.src.startsWith('blob:')) {
-                const serializableFiles = appState.vfsFiles.map(f => ({ 
-                    name: f.name, 
-                    type: f.type, 
-                    url: f.url,
-                    size: formatBytes(f.size) 
-                }));
+                const serializableFiles = Object.entries(appState.vfsBlob).map(([path, content]) => {
+                    const blob = getFileContentAsBlob(path);
+                    const size = blob instanceof Blob ? blob.size : 0;
+                    const url = blob instanceof Blob ? URL.createObjectURL(blob) : '#';
+                    return { 
+                        name: path, 
+                        type: getMimeType(path), 
+                        url: url,
+                        size: formatBytes(size) 
+                    };
+                });
                 (event.source as Window).postMessage({ type: 'LIA_STUDIO_FILE_LIST', files: serializableFiles }, '*');
             }
         }
@@ -580,36 +643,11 @@ export function initializeEventListeners() {
         }
 
         const content = dom.editorPaneTextarea.value;
-        const existingFileIndex = appState.vfsFiles.findIndex(f => f.name === fileName);
-
-        if (existingFileIndex > -1) {
-            // This is an overwrite, which is what we need the strongest warning for.
-            const existingFile = appState.vfsFiles[existingFileIndex];
-            const newBlob = new Blob([content], { type: existingFile.type });
-            URL.revokeObjectURL(existingFile.url);
-            existingFile.content = content;
-            existingFile.raw = newBlob;
-            existingFile.url = URL.createObjectURL(newBlob);
-            existingFile.size = newBlob.size;
-        } else {
-            const mimeType = getMimeType(fileName);
-            const newBlob = new Blob([content], { type: mimeType });
-            const newFile: FileBlob = {
-                name: fileName,
-                content: content,
-                raw: newBlob,
-                url: URL.createObjectURL(newBlob),
-                type: mimeType,
-                size: newBlob.size,
-            };
-            appState.vfsFiles.push(newFile);
-        }
-
-        updateAndSaveVFS(appState.vfsFiles);
+        saveFileToVFS(fileName, content);
         alert(`File '${fileName}' saved successfully.`);
     });
 
-    dom.editorOpenButton?.addEventListener('click', () => {
+    dom.editorOpenButton?.addEventListener('click', async () => {
         if (!dom.editorOpenSelect || !dom.editorPaneTextarea || !dom.editorSaveFilenameInput || !dom.editorWarningBanner) return;
 
         const fileName = dom.editorOpenSelect.value;
@@ -628,11 +666,13 @@ export function initializeEventListeners() {
             dom.editorWarningBanner.style.display = 'none';
         }
 
-        const fileToOpen = appState.vfsFiles.find(f => f.name === fileName);
-        if (fileToOpen) {
-            dom.editorPaneTextarea.value = fileToOpen.content;
-            dom.editorSaveFilenameInput.value = fileToOpen.name;
-            appState.editorContent = fileToOpen.content;
+        const fileToOpen = await getFileContentAsText(fileName);
+        if (fileToOpen !== undefined) {
+            dom.editorPaneTextarea.value = fileToOpen;
+            dom.editorSaveFilenameInput.value = fileName;
+            appState.editorContent = fileToOpen;
+        } else {
+            dom.editorPaneTextarea.value = '[Binary or non-string file content cannot be displayed in this editor]';
         }
     });
     
@@ -643,8 +683,35 @@ export function initializeEventListeners() {
     });
 
     // Delegated listeners for dynamic content
-    document.body.addEventListener('click', (e) => {
+    document.body.addEventListener('click', async (e) => {
         const target = e.target as HTMLElement;
+
+        // Command Palette
+        const commandItem = target.closest('.command-list-item');
+        if (commandItem) {
+            const commandId = commandItem.getAttribute('data-command-id');
+            const commandType = commandItem.getAttribute('data-command-type');
+            const commandSyntax = commandItem.getAttribute('data-command-syntax');
+
+            if (commandId) { // This handles UI commands
+                const command = appState.commandPaletteCommands.find(c => c.id === commandId);
+                if (command) {
+                    await command.action();
+                }
+            } else if (commandType && commandSyntax) { // This handles LIA/Linux commands
+                if (commandType === 'lia-kernel' && dom.liaKernelInput) {
+                    dom.liaKernelInput.value = commandSyntax;
+                    await switchTab('lia-kernel-tab');
+                    dom.liaKernelInput.focus();
+                    autoExpandTextarea(dom.liaKernelInput);
+                } else if (commandType === 'vfs-shell' && dom.vfsShellInput) {
+                    dom.vfsShellInput.value = commandSyntax;
+                    await switchTab('vfs-shell-tab');
+                    dom.vfsShellInput.focus();
+                }
+            }
+            return; // Prevent other handlers from firing on the same click
+        }
         
         // Tools protocol list
         if (target.closest('.protocol-item')) {
@@ -653,15 +720,6 @@ export function initializeEventListeners() {
                  appState.activeToolProtocol = protocol as any;
                  renderToolsTab();
              }
-        }
-
-        // UI Command Search Results
-        if (target.closest('.ui-command-item')) {
-            const commandId = target.closest('.ui-command-item')?.getAttribute('data-command-id');
-            const command = appState.commandPaletteCommands.find(c => c.id === commandId);
-            if (command) {
-                command.action();
-            }
         }
 
         // Tools Send Button
@@ -697,25 +755,28 @@ export function initializeEventListeners() {
         if (target.id === 'lia-command-search-input') {
             const query = target.value.toLowerCase();
             const filtered = appState.liaCommandList.filter(cmd => {
-                return cmd.name.toLowerCase().includes(query) ||
-                       cmd.sig.toLowerCase().includes(query) ||
-                       cmd.desc.toLowerCase().includes(query);
+                return cmd.name?.toLowerCase().includes(query) ||
+                       cmd.sig?.toLowerCase().includes(query) ||
+                       cmd.desc?.toLowerCase().includes(query);
             });
             const resultsContainer = document.getElementById('lia-command-search-results');
             if (!resultsContainer) return;
             resultsContainer.innerHTML = '';
 
             if (filtered.length === 0) {
-                resultsContainer.innerHTML = '<div class="lia-command-item"><p>No LIA commands found.</p></div>';
+                resultsContainer.innerHTML = '<div class="command-list-item"><p>No LIA commands found.</p></div>';
                 return;
             }
             
             filtered.forEach(cmd => {
+                const commandName = cmd.name || 'Unknown Command';
                 const item = document.createElement('div');
-                item.className = 'lia-command-item';
+                item.className = 'command-list-item lia-command';
+                item.dataset.commandType = 'lia-kernel';
+                item.dataset.commandSyntax = commandName;
                 item.innerHTML = `
-                    <strong>${cmd.name}</strong> <code>(sig: ${cmd.sig})</code>
-                    <p>${cmd.desc}</p>
+                    <strong>${commandName}</strong> <code>(sig: ${cmd.sig || 'N/A'})</code>
+                    <p>${cmd.desc || 'No description.'}</p>
                 `;
                 resultsContainer.appendChild(item);
             });
@@ -743,23 +804,25 @@ export function initializeEventListeners() {
             resultsContainer.innerHTML = '';
 
             if (filtered.length === 0) {
-                resultsContainer.innerHTML = '<div class="lia-command-item"><p>No LIA Linux commands found.</p></div>';
+                resultsContainer.innerHTML = '<div class="command-list-item"><p>No LIA Linux commands found.</p></div>';
                 return;
             }
             
             filtered.forEach(cmd => {
                 const item = document.createElement('div');
-                item.className = 'lia-command-item';
+                item.className = 'command-list-item linux-command';
+                item.dataset.commandType = 'vfs-shell';
+                item.dataset.commandSyntax = cmd;
                 item.innerHTML = `<p><code>${cmd.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></p>`;
                 resultsContainer.appendChild(item);
             });
         }
     });
 
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', async (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
             e.preventDefault();
-            switchTab('search-tab');
+            await switchTab('search-tab');
             const searchInput = document.getElementById('ui-command-search-input') as HTMLInputElement | null;
             searchInput?.focus();
             searchInput?.select();

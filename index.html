@@ -15,7 +15,8 @@
     "vite": "https://esm.sh/vite@^7.0.4",
     "path": "https://esm.sh/path@^0.12.7",
     "pako": "https://esm.sh/pako@^2.1.0",
-    "@mlc-ai/web-llm": "https://esm.sh/@mlc-ai/web-llm@^0.2.79"
+    "@mlc-ai/web-llm": "https://esm.sh/@mlc-ai/web-llm@^0.2.79",
+    "jsonc-parser": "https://esm.sh/jsonc-parser@^3.3.1"
   }
 }
 </script>
@@ -49,6 +50,7 @@
 
         <nav id="tab-nav">
             <button class="tab-button active" data-tab-id="lia-assistant-tab">LIA Helper</button>
+            <button class="tab-button" data-tab-id="vfs-shell-tab">VFS Shell</button>
             <button class="tab-button" data-tab-id="code-assistant-tab">Code Helper</button>
             <button class="tab-button" data-tab-id="vanilla-tab">Vanilla</button>
             <button class="tab-button" data-tab-id="search-tab">Commands</button>
@@ -105,6 +107,24 @@
                         <div class="chat-input-container">
                             <textarea id="lia-assistant-input" placeholder="Ask the LIA Assistant a question..." rows="1"></textarea>
                             <button id="send-lia-assistant-button" title="Send (Ctrl+Enter)">Send</button>
+                        </div>
+                    </div>
+                    <div id="vfs-shell-tab" class="tab-pane">
+                        <div class="vfs-shell-container">
+                            <div id="vfs-shell-output">
+                                <div class="vfs-shell-line">🌀 LIA Virtual Shell — Recursion Interface v1.0</div>
+                                <div class="vfs-shell-line">Type 'help' for a list of commands.</div>
+                            </div>
+                            <div class="vfs-input-container">
+                                <span class="vfs-prompt">LIA:/#&nbsp;</span>
+                                <input type="text" id="vfs-shell-input" autocomplete="off" spellcheck="false" autofocus>
+                            </div>
+                        </div>
+                        <div id="vfs-vi-editor-overlay" class="hidden">
+                            <div id="vfs-vi-header">
+                                Editing: <span id="vfs-vi-filename"></span> | [Ctrl+S] to Save and Exit | [Ctrl+Q] to Quit without Saving
+                            </div>
+                            <textarea id="vfs-vi-textarea" spellcheck="false"></textarea>
                         </div>
                     </div>
                      <div id="fs-util-tab" class="tab-pane">
@@ -320,6 +340,8 @@
             <nav id="metis-modal-tab-nav">
                  <button class="tab-button active" data-tab-id="metis-panopticon-tab">Panopticon</button>
                  <button class="tab-button" data-tab-id="metis-monologue-tab">Internal Monologue</button>
+                 <button class="tab-button" data-tab-id="metis-grimoire-tab">Grimoire</button>
+                 <button class="tab-button" data-tab-id="metis-compendium-tab">Compendium</button>
                  <button class="tab-button" data-tab-id="metis-vfs-analysis-tab">VFS Analysis</button>
                  <button class="tab-button" data-tab-id="metis-log-anomalies-tab">Log Anomalies</button>
             </nav>
@@ -335,6 +357,8 @@
                             <button id="send-metis-chat-button-modal" title="Execute">Exec</button>
                         </div>
                     </div>
+                    <div id="metis-grimoire-tab" class="tab-pane"></div>
+                    <div id="metis-compendium-tab" class="tab-pane"></div>
                     <div id="metis-vfs-analysis-tab" class="tab-pane">
                         <div id="vfs-analysis-content-modal"></div>
                     </div>
@@ -364,6 +388,8 @@
             <nav id="pupa-modal-tab-nav">
                  <button class="tab-button active" data-tab-id="pupa-panopticon-tab">Panopticon</button>
                  <button class="tab-button" data-tab-id="pupa-monologue-tab">Internal Monologue</button>
+                 <button class="tab-button" data-tab-id="pupa-grimoire-tab">Grimoire</button>
+                 <button class="tab-button" data-tab-id="pupa-compendium-tab">Compendium</button>
                  <button class="tab-button" data-tab-id="pupa-vfs-analysis-tab">VFS Analysis</button>
                  <button class="tab-button" data-tab-id="pupa-log-anomalies-tab">Log Anomalies</button>
             </nav>
@@ -379,6 +405,8 @@
                             <button id="send-pupa-chat-button-modal" title="Whisper">Whisper</button>
                         </div>
                     </div>
+                    <div id="pupa-grimoire-tab" class="tab-pane"></div>
+                    <div id="pupa-compendium-tab" class="tab-pane"></div>
                     <div id="pupa-vfs-analysis-tab" class="tab-pane">
                         <div id="vfs-analysis-content-pupa-modal"></div>
                     </div>

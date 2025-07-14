@@ -1,19 +1,9 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
 // --- Type Definitions ---
-export interface FileBlob {
-    name: string;
-    url: string;
-    type: string;
-    size: number;
-    raw: Blob;
-    content: string;
-}
 export type LiaState = { [key: string]: number | string | string[] };
 export type LiaMetricDefinition = { id: string, name: string, value_initial: number, range: [number, number], description: string, dynamics_notes?: string, critical_threshold?: number };
 export type LiaQualitativeDefinition = { id: string, name: string, initial_value: string, description: string };
@@ -83,7 +73,7 @@ export interface Command {
     name: string;
     section: string;
     keywords?: string;
-    action: () => void;
+    action: () => void | Promise<void>;
 }
 
 export interface CaraState {
@@ -189,12 +179,16 @@ export type MetisState = {
     lts: number; // Liber Tracking Score
 };
 
+export type VFSBlob = {
+    [path: string]: string | Blob | any[]; // string for text, Blob for binary, array for special dev files
+};
+
 export type AppState = {
     isSwitchingTabs: boolean;
     currentActiveTabId: string;
     lastUserAction: string;
-    vfsFiles: FileBlob[];
-    activeFile: FileBlob | null;
+    activeFilePath: string | null;
+    vfsBlob: VFSBlob;
     liaKernelChatHistory: ChatMessage[];
     fsUtilChatHistory: ChatMessage[];
     liaAssistantChatHistory: ChatMessage[];
@@ -239,6 +233,9 @@ export type AppState = {
     liaCommandList: any[];
     linuxCommandList: string[];
     editorContent: string;
+    // VFS Shell State
+    vfsShellHistory: string[];
+    vfsShellHistoryIndex: number;
+    vfsViIsActive: boolean;
+    vfsViCurrentFile: string | null;
 };
-
-export interface DefaultFile { name: string; content: string; }

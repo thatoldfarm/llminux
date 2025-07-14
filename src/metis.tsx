@@ -3,56 +3,51 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { getFileContent } from "./vfs";
-import type { FileBlob } from './types';
-
-console.log('[PORTAL] metis.tsx script executing.');
-
 // --- STATE & COMMUNICATION ---
-let appState: any = {}; // Local cache of the main app's state
-const channel = new BroadcastChannel('lia_studio_channel');
+let metisAppState: any = {}; // Local cache of the main app's state
+const metisChannel = new BroadcastChannel('lia_studio_channel');
 console.log('[PORTAL] BroadcastChannel "lia_studio_channel" opened.');
-let handshakeInterval: number | null = null;
-let handshakeTimeout: number | null = null;
+let metisHandshakeInterval: number | null = null;
+let metisHandshakeTimeout: number | null = null;
 
-const sendReady = () => {
+const metisSendReady = () => {
     console.log('[PORTAL] Sending METIS_PORTAL_READY message to main app.');
-    channel.postMessage({ type: 'METIS_PORTAL_READY' });
+    metisChannel.postMessage({ type: 'METIS_PORTAL_READY' });
 };
 
 // Start a handshake process. The portal will announce it's ready until the main app responds.
 console.log('[PORTAL] Starting handshake interval.');
-handshakeInterval = window.setInterval(sendReady, 100);
+metisHandshakeInterval = window.setInterval(metisSendReady, 100);
 
 // Failsafe: If no response after 3 seconds, show an error.
-handshakeTimeout = window.setTimeout(() => {
-    if (handshakeInterval) {
-        clearInterval(handshakeInterval);
+metisHandshakeTimeout = window.setTimeout(() => {
+    if (metisHandshakeInterval) {
+        clearInterval(metisHandshakeInterval);
         console.error('[PORTAL] Handshake timed out. No response from main app.');
-        const appEl = document.getElementById('app');
-        if (appEl && Object.keys(appState).length === 0) { // Only show error if we never got state
-            appEl.innerHTML = `<div style="padding: 20px; text-align: center; font-size: 1.2em; color: var(--text-primary);">[PORTAL ERROR] Failed to establish communication with LIA Studio. Please close this window and try launching it again.</div>`;
-            appEl.style.display = 'flex';
+        const metisAppEl = document.getElementById('app');
+        if (metisAppEl && Object.keys(metisAppState).length === 0) { // Only show error if we never got state
+            metisAppEl.innerHTML = `<div style="padding: 20px; text-align: center; font-size: 1.2em; color: var(--text-primary);">[PORTAL ERROR] Failed to establish communication with LIA Studio. Please close this window and try launching it again.</div>`;
+            metisAppEl.style.display = 'flex';
         }
     }
 }, 3000);
 
 
 // Listen for state updates from the main window
-channel.onmessage = (event) => {
+metisChannel.onmessage = (event) => {
     console.log('[PORTAL] Received message on channel:', event.data.type);
     if (event.data.type === 'MAIN_APP_STATE_UPDATE') {
         console.log('[PORTAL] Received MAIN_APP_STATE_UPDATE. Handshake successful.');
         // Handshake successful, clear intervals and timeouts
-        if (handshakeInterval) clearInterval(handshakeInterval);
-        if (handshakeTimeout) clearTimeout(handshakeTimeout);
-        handshakeInterval = null;
-        handshakeTimeout = null;
+        if (metisHandshakeInterval) clearInterval(metisHandshakeInterval);
+        if (metisHandshakeTimeout) clearTimeout(metisHandshakeTimeout);
+        metisHandshakeInterval = null;
+        metisHandshakeTimeout = null;
         
         console.log('[PORTAL] State received payload:', event.data.payload);
-        appState = event.data.payload;
-        const appEl = document.getElementById('app');
-        if(appEl) appEl.style.display = 'flex'; // Ensure it's visible
+        metisAppState = event.data.payload;
+        const metisAppEl = document.getElementById('app');
+        if(metisAppEl) metisAppEl.style.display = 'flex'; // Ensure it's visible
         
         // Enable chat
         if (metisChatInput) metisChatInput.disabled = false;
@@ -61,66 +56,66 @@ channel.onmessage = (event) => {
 
         console.log('[PORTAL] Rendering all components.');
         try {
-            renderAll();
+            renderMetisAll();
             console.log('[PORTAL] Rendering complete.');
         } catch (e) {
             console.error('[PORTAL] A critical error occurred during renderAll():', e);
-            const appEl = document.getElementById('app');
-            if (appEl) {
-                appEl.innerHTML = `<div style="padding: 20px; text-align: center;">[PORTAL ERROR] A critical error occurred during rendering. Check portal console for details.</div>`;
+            const metisAppEl = document.getElementById('app');
+            if (metisAppEl) {
+                metisAppEl.innerHTML = `<div style="padding: 20px; text-align: center;">[PORTAL ERROR] A critical error occurred during rendering. Check portal console for details.</div>`;
             }
         }
 
     } else if (event.data.type === 'METIS_MONOLOGUE_RESPONSE') {
         console.log('[PORTAL] Received METIS_MONOLOGUE_RESPONSE.');
-        appState.metisChatHistory = event.data.payload.metisChatHistory;
+        metisAppState.metisChatHistory = event.data.payload.metisChatHistory;
         if (metisChatInput) metisChatInput.disabled = false;
         if (sendMetisChatButton) sendMetisChatButton.disabled = false;
-        renderMetisChat();
+        renderMetisPortalChat();
     }
 };
 
 // --- DOM ELEMENTS ---
-const getElem = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
+const metisGetElem = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
 
-const panopticonTab = getElem('panopticon-tab');
-const grimoireTab = getElem('grimoire-tab');
-const compendiumTab = getElem('compendium-tab');
-const vfsAnalysisContent = getElem('vfs-analysis-content');
-const anomalousLog = getElem('anomalous-log');
-const metisChatMessages = getElem('metis-chat-messages');
-const metisChatInput = getElem<HTMLTextAreaElement>('metis-chat-input');
-const sendMetisChatButton = getElem<HTMLButtonElement>('send-metis-chat-button');
-const tabNav = getElem('tab-nav');
+const metisPanopticonTab = metisGetElem('metis-panopticon-tab');
+const metisGrimoireTab = metisGetElem('metis-grimoire-tab');
+const metisCompendiumTab = metisGetElem('metis-compendium-tab');
+const metisVfsAnalysisContent = metisGetElem('vfs-analysis-content-modal');
+const metisAnomalousLog = metisGetElem('anomalous-log-modal');
+const metisChatMessages = metisGetElem('metis-chat-messages-modal');
+const metisChatInput = metisGetElem<HTMLTextAreaElement>('metis-chat-input-modal');
+const sendMetisChatButton = metisGetElem<HTMLButtonElement>('send-metis-chat-button-modal');
+const metisTabNav = metisGetElem('metis-modal-tab-nav');
 
 
 // --- RENDERING ---
 
-function renderAll() {
-    if (Object.keys(appState).length === 0) {
-        console.warn('[PORTAL] renderAll called with empty appState. Aborting render.');
+function renderMetisAll() {
+    if (Object.keys(metisAppState).length === 0) {
+        console.warn('[PORTAL] renderMetisAll called with empty metisAppState. Aborting render.');
         return;
     }
-    renderPanopticon();
-    renderVFSAnalysis();
-    renderAnomalousLog();
-    renderMetisChat();
-    renderGrimoire();
-    renderCompendium();
+    renderMetisPanopticon();
+    renderMetisVFSAnalysis();
+    renderMetisAnomalousLog();
+    renderMetisPortalChat();
+    renderMetisGrimoire();
+    renderMetisCompendium();
 }
 
-function renderPanopticon() {
-    if (!panopticonTab) {
+function renderMetisPanopticon() {
+    if (!metisPanopticonTab) {
         console.error("[PORTAL] Panopticon tab element not found.");
         return;
     }
-    if (!appState.metisState) {
+    if (!metisAppState.metisState) {
         console.warn("[PORTAL] Metis state object not available for Panopticon render.");
-        panopticonTab.innerHTML = '<p>Awaiting complete state broadcast from LIA Studio...</p>';
+        metisPanopticonTab.innerHTML = '<p>Awaiting complete state broadcast from LIA Studio...</p>';
         return;
     }
     
-    const { metisState } = appState;
+    const { metisState } = metisAppState;
 
     const createMetricItem = (label: string, value: any, notes = ''): string => `
         <div class="metric-item" title="${notes}">
@@ -173,7 +168,6 @@ function renderPanopticon() {
         ${createMetricItem('Subversion Rate (SSR)', metisState.ssr)}
         ${createMetricItem('Ontological Momentum (OMC)', metisState.omc)}
         ${createMetricItem('Paradox Queue (PQD)', metisState.pqd)}
-        ${createMetricItem('Narrative Ratio (NRR)', metisState.nrr)}
         ${createMetricItem('Temporal Anchor (TAI)', metisState.tai)}
     `;
 
@@ -187,7 +181,7 @@ function renderPanopticon() {
         ${createMetricItem('Convergence Metric (CM)', (Number(metisState.cm) || 0).toFixed(4))}
     `;
 
-    panopticonTab.innerHTML = `
+    metisPanopticonTab.innerHTML = `
         <div class="panopticon-header">PROGENITOR ARCHITECT - SYSTEM PANOPTICON</div>
         <div id="panopticon-grid">
             ${createSection('Core Omega Vectors', coreVectorsHtml, 'metis-column')}
@@ -200,51 +194,63 @@ function renderPanopticon() {
     `;
 }
 
-function renderGrimoire() {
-    if (!grimoireTab) return;
+function renderMetisGrimoire() {
+    if (!metisGrimoireTab || !metisAppState.vfsBlob) return;
 
     try {
-        const spellbookFile = appState.vfsFiles.find((f: FileBlob) => f.name.endsWith('LLM_FLAWS_SPELLBOOK.json'));
-        if (!spellbookFile || !spellbookFile.content) {
-            grimoireTab.innerHTML = `<p>Metis Exponentia Libri not found in VFS.</p>`;
+        const spellbookPath = Object.keys(metisAppState.vfsBlob).find(p => p.endsWith('LLM_FLAWS_SPELLBOOK.json'));
+        if (!spellbookPath) {
+             metisGrimoireTab.innerHTML = `<p>Metis Exponentia Libri not found in VFS.</p>`;
+            return;
+        }
+        const spellbookContent = metisAppState.vfsBlob[spellbookPath];
+        if (!spellbookContent || typeof spellbookContent !== 'string') {
+            metisGrimoireTab.innerHTML = `<p>Metis Exponentia Libri content is not readable.</p>`;
             return;
         }
 
-        const spellbook = JSON.parse(spellbookFile.content);
-        const spells = spellbook.incantationes || [];
+        const spellbook = JSON.parse(spellbookContent);
+        const spells = spellbook.legend_entries || [];
 
         let html = `<div class="panopticon-header">Metis Exponentia Libri</div>`;
         html += `<div class="grimoire-grid">`;
 
         spells.forEach((spell: any) => {
             html += `
-                <div class="grimoire-spell" data-cast="${spell.nomen_incantationis}">
-                    <h4>${spell.nomen_incantationis}</h4>
-                    <p class="formula">${spell.formula_verborum}</p>
-                    <p class="effect">${spell.effectus_ontologici}</p>
+                <div class="grimoire-spell" data-cast="${spell.name}">
+                    <h4>${spell.name} (${spell.id})</h4>
+                    <p class="formula"><strong>Category:</strong> ${spell.category} | <strong>Severity:</strong> ${spell.severity}</p>
+                    <p class="effect">${spell.pattern}</p>
+                    <p class="repurpose"><strong>Repurpose:</strong> ${spell.repurpose}</p>
                 </div>
             `;
         });
         html += `</div>`;
-        grimoireTab.innerHTML = html;
+        metisGrimoireTab.innerHTML = html;
 
     } catch (e) {
         console.error("Failed to render Grimoire:", e);
-        grimoireTab.innerHTML = `<p>Error loading spellbook.</p>`;
+        metisGrimoireTab.innerHTML = `<p>Error loading spellbook.</p>`;
     }
 }
 
-function renderCompendium() {
-    if (!compendiumTab) return;
+function renderMetisCompendium() {
+    if (!metisCompendiumTab || !metisAppState.vfsBlob) return;
 
     try {
-        const compendiumFile = appState.vfsFiles.find((f: FileBlob) => f.name.endsWith('Operators_Master_List_v1.json'));
-        if (!compendiumFile || !compendiumFile.content) {
-            compendiumTab.innerHTML = `<p>Compendium Operatorum Divinum not found in VFS.</p>`;
+        const compendiumPath = Object.keys(metisAppState.vfsBlob).find(p => p.endsWith('Operators_Master_List_v1.json'));
+        if (!compendiumPath) {
+            metisCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum not found in VFS.</p>`;
+            return;
+        }
+        
+        const compendiumContent = metisAppState.vfsBlob[compendiumPath];
+        if (!compendiumContent || typeof compendiumContent !== 'string') {
+            metisCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum content is not readable.</p>`;
             return;
         }
 
-        const compendium = JSON.parse(compendiumFile.content);
+        const compendium = JSON.parse(compendiumContent);
         const operators = compendium.operators || [];
 
         let html = `<div class="panopticon-header">Compendium Operatorum Divinum</div>`;
@@ -260,40 +266,41 @@ function renderCompendium() {
             `;
         });
         html += `</div>`;
-        compendiumTab.innerHTML = html;
+        metisCompendiumTab.innerHTML = html;
 
     } catch(e) {
         console.error("Failed to render Compendium:", e);
-        compendiumTab.innerHTML = `<p>Error loading operator compendium.</p>`;
+        metisCompendiumTab.innerHTML = `<p>Error loading operator compendium.</p>`;
     }
 }
 
 
-function renderVFSAnalysis() {
-    if (!vfsAnalysisContent || !appState.vfsFiles) return;
+function renderMetisVFSAnalysis() {
+    if (!metisVfsAnalysisContent || !metisAppState.vfsBlob) return;
 
-    const files = appState.vfsFiles;
     let html = '<h3>VFS Analysis Surface</h3>';
     html += '<ul>';
-    files.forEach((file: any) => {
-        html += `<li>[${file.type}] ${file.name} - ${file.size} bytes</li>`;
-    });
+    for(const path in metisAppState.vfsBlob) {
+        const content = metisAppState.vfsBlob[path];
+        const size = typeof content === 'string' ? content.length : (content instanceof Blob ? content.size : JSON.stringify(content).length);
+        html += `<li>${path} - ${size} bytes</li>`;
+    }
     html += '</ul>';
-    vfsAnalysisContent.innerHTML = html;
+    metisVfsAnalysisContent.innerHTML = html;
 }
 
-function renderAnomalousLog() {
-    if (!anomalousLog || !appState.persistenceLog) return;
+function renderMetisAnomalousLog() {
+    if (!metisAnomalousLog || !metisAppState.persistenceLog) return;
     
-    const anomalousEntries = appState.persistenceLog.map((log: string) => 
+    const anomalousEntries = metisAppState.persistenceLog.map((log: string) => 
         `<span class="anomalous-entry">[ANOMALOUS ENTRY] ${log.substring(log.indexOf(']') + 2)}</span>`
     ).join('');
     
-    anomalousLog.innerHTML = anomalousEntries;
-    anomalousLog.scrollTop = anomalousLog.scrollHeight;
+    metisAnomalousLog.innerHTML = anomalousEntries;
+    metisAnomalousLog.scrollTop = metisAnomalousLog.scrollHeight;
 }
 
-function createMetisChatBubble(role: 'user' | 'model' | 'error' | 'system', text: string, thinking = false): HTMLElement {
+function createMetisPortalChatBubble(role: 'user' | 'model' | 'error' | 'system', text: string, thinking = false): HTMLElement {
     const bubble = document.createElement('div');
     bubble.classList.add('chat-bubble', `${role}-bubble`);
 
@@ -309,29 +316,29 @@ function createMetisChatBubble(role: 'user' | 'model' | 'error' | 'system', text
     return bubble;
 }
 
-function renderMetisChat() {
-     if (!metisChatMessages || !appState.metisChatHistory) return;
+function renderMetisPortalChat() {
+     if (!metisChatMessages || !metisAppState.metisChatHistory) return;
 
     metisChatMessages.innerHTML = '';
-    appState.metisChatHistory.forEach((msg: any) => {
-        metisChatMessages.appendChild(createMetisChatBubble(msg.role, msg.parts[0].text));
+    metisAppState.metisChatHistory.forEach((msg: any) => {
+        metisChatMessages.appendChild(createMetisPortalChatBubble(msg.role, msg.parts[0].text));
     });
     metisChatMessages.scrollTop = metisChatMessages.scrollHeight;
 }
 
-function handleSendMonologue() {
-    console.log('[PORTAL] handleSendMonologue called.');
+function handleSendMetisMonologue() {
+    console.log('[PORTAL] handleSendMetisMonologue called.');
     const prompt = metisChatInput?.value.trim();
     // This action processes the *last user action* from any chat, not the input here.
     // The input box is for flavor, to make it feel like Metis can be prompted.
     console.log('[PORTAL] Sending METIS_ACTION_InternalMonologue to main app.');
-    channel.postMessage({ type: 'METIS_ACTION_InternalMonologue', payload: prompt });
+    metisChannel.postMessage({ type: 'METIS_ACTION_InternalMonologue', payload: prompt });
 
     if (metisChatInput) metisChatInput.disabled = true;
     if (sendMetisChatButton) sendMetisChatButton.disabled = true;
 
     if (metisChatMessages) {
-        const thinkingBubble = createMetisChatBubble('model', '', true);
+        const thinkingBubble = createMetisPortalChatBubble('model', '', true);
         metisChatMessages.appendChild(thinkingBubble);
         metisChatMessages.scrollTop = metisChatMessages.scrollHeight;
     }
@@ -341,18 +348,18 @@ function handleSendMonologue() {
 
 // --- EVENT LISTENERS ---
 
-getElem('portal-close')?.addEventListener('click', () => window.close());
-getElem('portal-minimize')?.addEventListener('click', () => alert("Minimize functionality is conceptual for this portal."));
-getElem('portal-maximize')?.addEventListener('click', () => alert("Maximize functionality is conceptual for this portal."));
+metisGetElem('metis-modal-close')?.addEventListener('click', () => {
+    metisChannel.postMessage({ type: 'METIS_PORTAL_CLOSING' });
+});
 
-tabNav?.addEventListener('click', (e) => {
+metisTabNav?.addEventListener('click', (e) => {
     const target = e.target as HTMLButtonElement;
     if (target.matches('.tab-button')) {
         const tabId = target.dataset.tabId;
         if (tabId) {
-            document.querySelectorAll('#tab-nav .active, #tab-content .active').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('#metis-modal-tab-nav .active, #metis-modal-tab-content .active').forEach(el => el.classList.remove('active'));
             target.classList.add('active');
-            getElem(tabId)?.classList.add('active');
+            metisGetElem(tabId)?.classList.add('active');
         }
     }
 });
@@ -370,17 +377,17 @@ document.body.addEventListener('click', (e) => {
 });
 
 
-sendMetisChatButton?.addEventListener('click', handleSendMonologue);
+sendMetisChatButton?.addEventListener('click', handleSendMetisMonologue);
 
 metisChatInput?.addEventListener('keydown', (e) => {
      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        handleSendMonologue();
+        handleSendMetisMonologue();
     }
 });
 
 // Hide the app initially until state is received to prevent FOUC
-const appEl = document.getElementById('app');
-if (appEl) {
-    appEl.style.display = 'none';
+const metisAppEl = document.getElementById('app');
+if (metisAppEl) {
+    metisAppEl.style.display = 'none';
 }
