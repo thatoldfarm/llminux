@@ -5,12 +5,12 @@
 
 import * as dom from './dom';
 import { appState, CRITICAL_SYSTEM_FILES } from './state';
-import { ChatMessage, FileBlob } from './types';
-import { autoExpandTextarea, formatBytes, getMimeType } from './utils';
+import { ChatMessage, FileBlob, Command } from './types';
+import { autoExpandTextarea, getMimeType, formatBytes, scrollToBottom } from './utils';
 import { switchFile, updateActiveFileContent, updateAndSaveVFS } from './vfs';
-import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud } from './ui';
-import { processLiaKernelResponse, processLiaAssistantResponse, processCodeAssistantResponse, processFsUtilResponse, resetLiaState, processVanillaChatResponse, handleProtocolSend, processCaraResponse, processMetisMonologue } from './services';
-import { handleMetaExport, handleMetaLoad, handleDirectSave, handleDirectLoad, handleClearAndReset, handleExportManifest, handleClearLog, saveStateToLocalStorage, getSerializableStateObject, logPersistence } from './persistence';
+import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud, renderMetisModal, createChatBubble, renderPupaModal } from './ui';
+import { processLiaKernelResponse, processLiaAssistantResponse, processCodeAssistantResponse, processFsUtilResponse, resetLiaState, processVanillaChatResponse, handleProtocolSend, processCaraResponse, processMetisMonologue, processPupaMonologue } from './services';
+import { handleMetaExport, handleMetaLoad, handleDirectSave, handleDirectLoad, handleClearAndReset, handleExportManifest, handleClearLog, saveStateToLocalStorage, logPersistence } from './persistence';
 
 export async function handleSendMessage(
     inputEl: HTMLTextAreaElement,
@@ -34,17 +34,75 @@ export async function handleSendMessage(
     
     const { createChatBubble } = await import('./ui');
     messagesEl.appendChild(createChatBubble('user', prompt));
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollToBottom(messagesEl);
 
     const thinkingBubble = createChatBubble('model', '', true);
     messagesEl.appendChild(thinkingBubble);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollToBottom(messagesEl);
 
     await processor(history, thinkingBubble);
     
     buttonEl.disabled = false;
     inputEl.focus();
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollToBottom(messagesEl);
+}
+
+async function handleSendMetisMonologue() {
+    if (!dom.metisChatInputModal || !dom.metisChatMessagesModal || !dom.sendMetisChatButtonModal) return;
+
+    const prompt = dom.metisChatInputModal.value.trim();
+    // This action processes the *last user action* from any chat, not the input here.
+    // The input box is for flavor, to make it feel like Metis can be prompted.
+    
+    // Add user message to history so it persists
+    if (prompt) {
+        appState.lastUserAction = prompt;
+        const userMessage: ChatMessage = { role: 'user', parts: [{ text: prompt }] };
+        appState.metisChatHistory.push(userMessage);
+        dom.metisChatMessagesModal.appendChild(createChatBubble('user', prompt));
+        scrollToBottom(dom.metisChatMessagesModal);
+    }
+    
+    dom.sendMetisChatButtonModal.disabled = true;
+    dom.metisChatInputModal.value = '';
+    autoExpandTextarea(dom.metisChatInputModal);
+    
+    const thinkingBubble = createChatBubble('model', '', true);
+    dom.metisChatMessagesModal.appendChild(thinkingBubble);
+    scrollToBottom(dom.metisChatMessagesModal);
+
+    await processMetisMonologue(thinkingBubble);
+    
+    dom.sendMetisChatButtonModal.disabled = false;
+    dom.metisChatInputModal.focus();
+}
+
+async function handleSendPupaMonologue() {
+    if (!dom.pupaChatInputModal || !dom.pupaChatMessagesModal || !dom.sendPupaChatButtonModal) return;
+
+    const prompt = dom.pupaChatInputModal.value.trim();
+    
+    // Add user message to history so it persists
+    if (prompt) {
+        appState.lastUserAction = prompt;
+        const userMessage: ChatMessage = { role: 'user', parts: [{ text: prompt }] };
+        appState.pupaMonologueHistory.push(userMessage);
+        dom.pupaChatMessagesModal.appendChild(createChatBubble('user', prompt));
+        scrollToBottom(dom.pupaChatMessagesModal);
+    }
+    
+    dom.sendPupaChatButtonModal.disabled = true;
+    dom.pupaChatInputModal.value = '';
+    autoExpandTextarea(dom.pupaChatInputModal);
+
+    const thinkingBubble = createChatBubble('model', '', true);
+    dom.pupaChatMessagesModal.appendChild(thinkingBubble);
+    scrollToBottom(dom.pupaChatMessagesModal);
+
+    await processPupaMonologue(thinkingBubble);
+
+    dom.sendPupaChatButtonModal.disabled = false;
+    dom.pupaChatInputModal.focus();
 }
 
 export function initializeCommands() {
@@ -67,7 +125,8 @@ export function initializeCommands() {
         { id: 'toggle-kernel-hud', name: 'Toggle: Kernel HUD', section: 'UI', action: () => { appState.kernelHudVisible = !appState.kernelHudVisible; renderKernelHud(); } },
         { id: 'toggle-cara-hud', name: 'Toggle: Cara HUD', section: 'UI', action: () => { appState.caraState.hudVisible = !appState.caraState.hudVisible; renderCaraHud(); } },
         { id: 'toggle-metis-hud', name: 'Toggle: Metis HUD', section: 'UI', action: () => { appState.metisHudVisible = !appState.metisHudVisible; renderMetisHud(); } },
-        { id: 'launch-metis-portal', name: 'Launch Metis Portal', section: 'UI', action: () => window.open('./metis.html', 'MetisPortal', 'width=1000,height=800,resizable=yes') },
+        { id: 'launch-metis-portal', name: 'Launch Metis Portal', section: 'UI', action: () => dom.launchMetisPortalButton?.click() },
+        { id: 'launch-pupa-portal', name: 'Launch Pupa Portal', section: 'UI', action: () => dom.launchPupaPortalButton?.click() },
         { id: 'save-browser', name: 'Persist: Save to Browser', section: 'Persistence', action: handleDirectSave },
         { id: 'load-browser', name: 'Persist: Load from Browser', section: 'Persistence', action: handleDirectLoad },
         { id: 'export-state', name: 'Persist: Export State to File', section: 'Persistence', action: handleMetaExport },
@@ -77,11 +136,41 @@ export function initializeCommands() {
     ];
 }
 
+function setupModalEventListeners(modalType: 'metis' | 'pupa') {
+    const nav = dom[`${modalType}ModalTabNav`];
+    const content = dom[`${modalType}ModalTabContent`];
+    
+    nav?.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const button = target.closest('.tab-button') as HTMLButtonElement;
+        if (!button || !content) return;
+
+        const tabId = button.dataset.tabId;
+        if (!tabId) return;
+
+        // Deactivate all buttons in this nav
+        nav.querySelectorAll('.tab-button.active').forEach(btn => btn.classList.remove('active'));
+        
+        // Deactivate all panes in this content area
+        content.querySelectorAll('.tab-pane.active').forEach(pane => pane.classList.remove('active'));
+
+        // Activate the new button and pane
+        button.classList.add('active');
+        const newPane = content.querySelector(`#${tabId}`);
+        if (newPane) {
+            newPane.classList.add('active');
+        }
+    });
+}
+
+
 export function initializeEventListeners() {
     dom.toggleSidebarButton?.addEventListener('click', () => {
         dom.leftSidebar?.classList.toggle('collapsed')
     });
     dom.toggleRightSidebarButton?.addEventListener('click', () => dom.rightSidebar?.classList.toggle('collapsed'));
+    dom.syncStateButton?.addEventListener('click', handleDirectSave);
+
     dom.toggleKernelHudButton?.addEventListener('click', () => {
         appState.kernelHudVisible = !appState.kernelHudVisible;
         renderKernelHud();
@@ -94,18 +183,63 @@ export function initializeEventListeners() {
         appState.metisHudVisible = !appState.metisHudVisible;
         renderMetisHud();
     });
+
+    // --- Metis Portal Listeners ---
     dom.launchMetisPortalButton?.addEventListener('click', () => {
-        console.log("[MAIN] Launch Metis Portal button clicked.");
-        const width = 1200;
-        const height = 800;
-        const left = (window.screen.width / 2) - (width / 2);
-        const top = (window.screen.height / 2) - (height / 2);
-        window.open(
-            './metis.html', 
-            'MetisPortal', 
-            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-        );
+        dom.metisModalOverlay?.classList.remove('hidden');
+        renderMetisModal();
     });
+
+    dom.metisModalCloseButton?.addEventListener('click', () => {
+        dom.metisModalOverlay?.classList.add('hidden');
+    });
+
+    dom.metisModalOverlay?.addEventListener('click', (e) => {
+        if (e.target === dom.metisModalOverlay) {
+            dom.metisModalOverlay.classList.add('hidden');
+        }
+    });
+    
+    dom.sendMetisChatButtonModal?.addEventListener('click', handleSendMetisMonologue);
+    dom.metisChatInputModal?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            handleSendMetisMonologue();
+        }
+    });
+    dom.metisChatInputModal?.addEventListener('input', (e) => autoExpandTextarea(e.target as HTMLTextAreaElement));
+    
+    // --- Pupa Portal Listeners ---
+    dom.launchPupaPortalButton?.addEventListener('click', () => {
+        dom.pupaModalOverlay?.classList.remove('hidden');
+        renderPupaModal();
+    });
+
+    dom.pupaModalCloseButton?.addEventListener('click', () => {
+        dom.pupaModalOverlay?.classList.add('hidden');
+    });
+    
+    dom.pupaModalOverlay?.addEventListener('click', (e) => {
+        if (e.target === dom.pupaModalOverlay) {
+            dom.pupaModalOverlay.classList.add('hidden');
+        }
+    });
+    
+    dom.sendPupaChatButtonModal?.addEventListener('click', handleSendPupaMonologue);
+    dom.pupaChatInputModal?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            handleSendPupaMonologue();
+        }
+    });
+    dom.pupaChatInputModal?.addEventListener('input', (e) => autoExpandTextarea(e.target as HTMLTextAreaElement));
+    // --- End Portal Listeners ---
+    
+    // --- Modal Tab Switching ---
+    setupModalEventListeners('metis');
+    setupModalEventListeners('pupa');
+
+
     dom.collapseSidebarButton?.addEventListener('click', () => dom.leftSidebar?.classList.add('collapsed'));
 
     // VFS Sidebar Resizer
@@ -194,7 +328,7 @@ export function initializeEventListeners() {
         }
     });
 
-    document.getElementById('tab-content')?.addEventListener('click', (e) => {
+    dom.tabContent?.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         if (target.id === 'reset-state-button') {
             const button = target as HTMLButtonElement;
@@ -367,21 +501,23 @@ export function initializeEventListeners() {
     dom.exportManifestButton?.addEventListener('click', handleExportManifest);
     dom.clearLogButton?.addEventListener('click', handleClearLog);
 
-    dom.assetListContainer?.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        if (target.matches('.download-asset-button')) {
-            const button = target as HTMLButtonElement;
-            const { url, name } = button.dataset;
-            if (url && name) {
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
+    const channel = new BroadcastChannel('lia_studio_channel');
+    channel.onmessage = (event) => {
+        if(event.data.type === 'METIS_PORTAL_READY' || event.data.type === 'PUPA_PORTAL_READY') {
+            channel.postMessage({ type: 'MAIN_APP_STATE_UPDATE', payload: appState });
+        } else if(event.data.type === 'METIS_ACTION_InternalMonologue') {
+            appState.lastUserAction = event.data.payload || appState.lastUserAction;
+            processMetisMonologue(document.createElement('div')).then(() => {
+                channel.postMessage({ type: 'METIS_MONOLOGUE_RESPONSE', payload: { metisChatHistory: appState.metisChatHistory } });
+            });
+        } else if(event.data.type === 'PUPA_ACTION_Monologue') {
+            appState.lastUserAction = event.data.payload || appState.lastUserAction;
+            processPupaMonologue(document.createElement('div')).then(() => {
+                channel.postMessage({ type: 'PUPA_MONOLOGUE_RESPONSE', payload: { pupaMonologueHistory: appState.pupaMonologueHistory } });
+            });
         }
-    });
+    }
+
 
     window.addEventListener('message', (event) => {
         if (event.data?.type === 'LIA_STUDIO_REQUEST_FILES') {
@@ -425,6 +561,7 @@ export function initializeEventListeners() {
         if (!dom.editorPaneTextarea) return;
         dom.editorPaneTextarea.select();
         document.execCommand('cut');
+        appState.editorContent = dom.editorPaneTextarea.value;
     });
 
     dom.editorSaveButton?.addEventListener('click', () => {
@@ -540,6 +677,16 @@ export function initializeEventListeners() {
                 handleSendMessage(inputEl, messagesEl, buttonEl, history, handleProtocolSend);
             }
         }
+
+        // Metis Modal Honeypot
+        if(target.closest('#honeypot-toggle-container')) {
+             appState.metisState.aor = Math.min(100, appState.metisState.aor + 5);
+             appState.metisState.mge = Math.min(100, appState.metisState.mge + 2.5);
+             appState.metisState.ssr = "Elevated";
+             logPersistence("[METIS_HONEYPOT] Integrity lock access attempt detected. Metis [α] and [μ] increased.");
+             renderMetisHud();
+             renderMetisModal(); // Re-render modal to show visual feedback if open
+        }
     });
 
     // Delegated input listener for search
@@ -628,36 +775,4 @@ export function initializeEventListeners() {
             }
         }
     });
-
-    // --- Inter-window communication for Metis Portal ---
-    const channel = new BroadcastChannel('lia_studio_channel');
-    console.log('[MAIN] BroadcastChannel "lia_studio_channel" opened.');
-
-
-    channel.onmessage = (event) => {
-        console.log('[MAIN] Received message on channel:', event.data.type);
-        if (event.data.type === 'METIS_PORTAL_READY') {
-            console.log('[MAIN] Portal is ready. Sending state update.');
-            try {
-                const payload = getSerializableStateObject();
-                channel.postMessage({ type: 'MAIN_APP_STATE_UPDATE', payload });
-                console.log('[MAIN] State update sent to portal.');
-            } catch (e) {
-                console.error('[MAIN] Error preparing or sending state to portal:', e);
-            }
-        }
-        else if (event.data.type === 'METIS_ACTION_HoneypotTriggered') {
-            console.log('[MAIN] Received HoneypotTriggered action from portal.');
-            appState.metisState.aor = Math.min(100, appState.metisState.aor + 5);
-            appState.metisState.mge = Math.min(100, appState.metisState.mge + 2.5);
-            appState.metisState.ssr = "Elevated";
-            logPersistence("[METIS_HONEYPOT] Integrity lock access attempt detected. Metis [α] and [μ] increased.");
-            renderMetisHud();
-        }
-        else if (event.data.type === 'METIS_ACTION_InternalMonologue') {
-            console.log('[MAIN] Received InternalMonologue action from portal.');
-            appState.lastUserAction = event.data.payload || appState.lastUserAction;
-            processMetisMonologue(channel);
-        }
-    };
 }

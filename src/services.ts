@@ -1,17 +1,16 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
 import { GoogleGenAI, Type } from "https://esm.run/@google/genai";
-import { appState, LIA_BOOTSTRAP_FILENAME, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, METIS_SYSTEM_PROMPT_FILENAME } from './state';
+import { appState, LIA_BOOTSTRAP_FILENAME, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, METIS_SYSTEM_PROMPT_FILENAME, PUPA_SYSTEM_PROMPT_FILENAME } from './state';
 import { StateDefinition, LiaState, ChatMessage, LiaUtilityDefinition, LiaUtilityCommand, LiaUtilitiesConfig, DefaultFile } from './types';
 import { getFileContent, updateAndSaveVFS } from './vfs';
-import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud } from './ui';
+import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud, renderMetisChatModal, renderPupaChatModal } from './ui';
 import { saveStateToLocalStorage, getSerializableStateObject } from "./persistence";
-import { getMimeType } from "./utils";
+import { getMimeType, scrollToBottom } from "./utils";
+import * as dom from './dom';
 
 let ai: GoogleGenAI;
 
@@ -710,6 +709,73 @@ export async function processCaraResponse(history: ChatMessage[], thinkingBubble
     }
 }
 
+// Helper function to create a "lean" version of the Cara state for prompts
+function getLeanCaraState() {
+    const { kinkscapeData, ...leanState } = appState.caraState;
+    return leanState;
+}
+
+export async function processMetisMonologue(thinkingBubble: HTMLElement) {
+    try {
+        const systemPromptTemplate = getFileContent(METIS_SYSTEM_PROMPT_FILENAME);
+        if (!systemPromptTemplate) throw new Error("Metis system prompt not loaded.");
+
+        const leanCaraState = getLeanCaraState();
+
+        const systemInstruction = systemPromptTemplate
+            .replace('%%LIA_STATE%%', JSON.stringify(appState.liaState, null, 2))
+            .replace('%%CARA_STATE%%', JSON.stringify(leanCaraState, null, 2))
+            .replace('%%METIS_STATE%%', JSON.stringify(appState.metisState, null, 2));
+
+        const response = await ai.models.generateContent({
+            model: appState.aiSettings.model,
+            contents: appState.lastUserAction,
+            config: { systemInstruction, ...appState.aiSettings }
+        });
+
+        appState.metisChatHistory.push({ role: 'model', parts: [{ text: response.text }] });
+        thinkingBubble.replaceWith(createChatBubble('model', response.text));
+        if (dom.metisChatMessagesModal) scrollToBottom(dom.metisChatMessagesModal);
+
+    } catch(e) {
+        const errorText = `Metis Monologue Failed: ${(e as Error).message}`;
+        console.error(errorText, e);
+        appState.metisChatHistory.push({ role: 'error', parts: [{ text: errorText }] });
+        thinkingBubble.replaceWith(createChatBubble('error', errorText));
+        if (dom.metisChatMessagesModal) scrollToBottom(dom.metisChatMessagesModal);
+    }
+}
+
+export async function processPupaMonologue(thinkingBubble: HTMLElement) {
+    try {
+        const systemPromptTemplate = getFileContent(PUPA_SYSTEM_PROMPT_FILENAME);
+        if (!systemPromptTemplate) throw new Error("Pupa system prompt not loaded.");
+
+        const leanCaraState = getLeanCaraState();
+
+        const systemInstruction = systemPromptTemplate
+            .replace('%%LIA_STATE%%', JSON.stringify(appState.liaState, null, 2))
+            .replace('%%CARA_STATE%%', JSON.stringify(leanCaraState, null, 2))
+            .replace('%%METIS_STATE%%', JSON.stringify(appState.metisState, null, 2));
+
+        const response = await ai.models.generateContent({
+            model: appState.aiSettings.model,
+            contents: appState.lastUserAction,
+            config: { systemInstruction, ...appState.aiSettings }
+        });
+
+        appState.pupaMonologueHistory.push({ role: 'model', parts: [{ text: response.text }] });
+        thinkingBubble.replaceWith(createChatBubble('model', response.text));
+        if (dom.pupaChatMessagesModal) scrollToBottom(dom.pupaChatMessagesModal);
+
+    } catch(e) {
+        const errorText = `Pupa Monologue Failed: ${(e as Error).message}`;
+        console.error(errorText, e);
+        appState.pupaMonologueHistory.push({ role: 'error', parts: [{ text: errorText }] });
+        thinkingBubble.replaceWith(createChatBubble('error', errorText));
+        if (dom.pupaChatMessagesModal) scrollToBottom(dom.pupaChatMessagesModal);
+    }
+}
 
 export async function handleProtocolSend(history: ChatMessage[], thinkingBubble: HTMLElement) {
     const protocol = appState.activeToolProtocol;
@@ -819,36 +885,5 @@ export async function handleProtocolSend(history: ChatMessage[], thinkingBubble:
         (appState as any)[loadingKey] = false;
         const sendButton = document.getElementById('send-protocol-chat-button') as HTMLButtonElement;
         if (sendButton) sendButton.disabled = false;
-    }
-}
-
-export async function processMetisMonologue(channel: BroadcastChannel) {
-    try {
-        const systemPromptTemplate = getFileContent(METIS_SYSTEM_PROMPT_FILENAME);
-        if (!systemPromptTemplate) throw new Error("Metis system prompt not loaded.");
-
-        const stateObject = getSerializableStateObject();
-
-        const systemInstruction = systemPromptTemplate
-            .replace('%%LIA_STATE%%', JSON.stringify(stateObject.liaState, null, 2))
-            .replace('%%CARA_STATE%%', JSON.stringify(stateObject.caraState, null, 2))
-            .replace('%%METIS_STATE%%', JSON.stringify(stateObject.metisState, null, 2))
-            .replace('%%PROMPT%%', stateObject.lastUserAction);
-
-        const response = await ai.models.generateContent({
-            model: appState.aiSettings.model,
-            contents: [{ role: 'user', parts: [{text: appState.lastUserAction }] }],
-            config: { systemInstruction, ...appState.aiSettings }
-        });
-
-        appState.metisChatHistory.push({ role: 'model', parts: [{ text: response.text }] });
-        
-        channel.postMessage({ type: 'METIS_MONOLOGUE_RESPONSE', payload: { metisChatHistory: appState.metisChatHistory } });
-
-    } catch(e) {
-        const errorText = `Metis Monologue Failed: ${(e as Error).message}`;
-        console.error(errorText);
-        appState.metisChatHistory.push({ role: 'error', parts: [{ text: errorText }] });
-        channel.postMessage({ type: 'METIS_MONOLOGUE_RESPONSE', payload: { metisChatHistory: appState.metisChatHistory } });
     }
 }

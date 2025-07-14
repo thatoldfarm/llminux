@@ -11,7 +11,6 @@ export default defineConfig(({ mode }) => {
         rollupOptions: {
           input: {
             main: path.resolve(__dirname, 'index.html'),
-            metis: path.resolve(__dirname, './public/metis.html'),
           },
         },
       },

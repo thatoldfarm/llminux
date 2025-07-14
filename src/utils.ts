@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -88,4 +87,14 @@ export const base64ToBlob = async (base64: string, type: string): Promise<Blob> 
 export function autoExpandTextarea(textarea: HTMLTextAreaElement) {
     textarea.style.height = 'auto';
     textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+export function scrollToBottom(element: HTMLElement | null) {
+    if (element) {
+        // Use a small timeout to allow the browser to render the new content
+        // and calculate the correct scrollHeight before scrolling.
+        setTimeout(() => {
+            element.scrollTop = element.scrollHeight;
+        }, 0);
+    }
 }

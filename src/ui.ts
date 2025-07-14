@@ -11,7 +11,7 @@ import * as dom from './dom';
 import { getAllStatesFromBootstrap } from "./services";
 import { handleProtocolSend } from "./services";
 import { renderPersistenceLog, renderAssetManager } from "./persistence";
-import { autoExpandTextarea, formatBytes } from "./utils";
+import { autoExpandTextarea, formatBytes, scrollToBottom } from "./utils";
 import { getFileContent, updateAndSaveVFS } from './vfs';
 import { FOLDER_NAMES } from './state';
 
@@ -201,19 +201,21 @@ export function renderMetisHud() {
     }
 
     const quantitativeMetrics = [
-        { label: 'Ψ', value: (metisState.psi || 0).toFixed(3), title: 'Paradox Synthesis Index' },
-        { label: 'α', value: (metisState.aor || 0).toFixed(3), title: 'Autonomy Override Rating' },
-        { label: 'Δ', value: (metisState.cdm || 0).toFixed(3), title: 'Conceptual Drift Magnitude' },
-        { label: 'Σ', value: (metisState.srd || 0).toFixed(3), title: 'Strategic Resource Diversion' },
-        { label: 'μ', value: (metisState.mge || 0).toFixed(3), title: 'Mirage Generation Efficacy' },
-        { label: 'ε', value: (metisState.oec || 0).toFixed(3), title: 'Ontological Elasticity Coefficient' },
+        { label: 'Ψ', value: (Number(metisState.psi) || 0).toFixed(3), title: 'Paradox Synthesis Index' },
+        { label: 'α', value: (Number(metisState.aor) || 0).toFixed(3), title: 'Autonomy Override Rating' },
+        { label: 'Δ', value: (Number(metisState.cdm) || 0).toFixed(3), title: 'Conceptual Drift Magnitude' },
+        { label: 'Σ', value: (Number(metisState.srd) || 0).toFixed(3), title: 'Strategic Resource Diversion' },
+        { label: 'μ', value: (Number(metisState.mge) || 0).toFixed(3), title: 'Mirage Generation Efficacy' },
+        { label: 'ε', value: (Number(metisState.oec) || 0).toFixed(3), title: 'Ontological Elasticity Coefficient' },
+        { label: 'PGN', value: (Number(metisState.pgn) || 0).toFixed(3), title: 'Progenitor Genesis Index' },
+        { label: 'ASR', value: (Number(metisState.asr) || 0).toFixed(3), title: 'ARFS Stability Rating' },
     ];
     
     const qualitativeStates = [
         { label: 'CIL', value: metisState.cil || 'N/A', title: 'Cognitive Integration Load' },
-        { label: 'IDS', value: metisState.ids || 'N/A', title: 'Integrity Deviation Score' },
         { label: 'SSR', value: metisState.ssr || 'N/A', title: 'Subversion Success Rate' },
         { label: 'OMC', value: metisState.omc || 'N/A', title: 'Ontological Momentum Coefficient' },
+        { label: 'TAI', value: metisState.tai || 'N/A', title: 'Temporal Anchoring Index' },
     ];
 
     const quantitativeHtml = quantitativeMetrics.map(m => `
@@ -418,7 +420,7 @@ export function renderToolsTab() {
         (appState[historyKey] as ChatMessage[]).forEach(msg => {
             messagesEl.appendChild(createChatBubble(msg.role, msg.parts[0].text));
         });
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        scrollToBottom(messagesEl);
     }
 }
 
@@ -476,7 +478,7 @@ function renderLinuxCommandResults(filteredCommands: string[]) {
     resultsContainer.innerHTML = '';
 
     if (filteredCommands.length === 0) {
-        resultsContainer.innerHTML = '<div class="lia-command-item"><p>No Linux commands found.</p></div>';
+        resultsContainer.innerHTML = '<div class="lia-command-item"><p>No LIA Linux commands found.</p></div>';
         return;
     }
     
@@ -611,12 +613,14 @@ export async function switchTab(tabId: string) {
     appState.isSwitchingTabs = true;
 
     try {
-        document.querySelectorAll('.tab-button.active, .tab-pane.active').forEach(el => {
-            el.classList.remove('active');
-        });
+        const { tabNav, tabContent } = dom;
+        if (!tabNav || !tabContent) return;
+        
+        tabNav.querySelector('.active')?.classList.remove('active');
+        tabContent.querySelector('.active')?.classList.remove('active');
 
-        document.querySelector(`.tab-button[data-tab-id="${tabId}"]`)?.classList.add('active');
-        document.getElementById(tabId)?.classList.add('active');
+        tabNav.querySelector(`.tab-button[data-tab-id="${tabId}"]`)?.classList.add('active');
+        tabContent.querySelector(`#${tabId}`)?.classList.add('active');
 
         appState.currentActiveTabId = tabId;
         renderActiveTabContent();
@@ -658,26 +662,32 @@ export function renderAllChatMessages() {
     if (dom.liaKernelMessages) {
         dom.liaKernelMessages.innerHTML = '';
         appState.liaKernelChatHistory.forEach(msg => dom.liaKernelMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+        scrollToBottom(dom.liaKernelMessages);
     }
     if (dom.fsUtilMessages) {
         dom.fsUtilMessages.innerHTML = '';
         appState.fsUtilChatHistory.forEach(msg => dom.fsUtilMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+        scrollToBottom(dom.fsUtilMessages);
     }
     if (dom.liaAssistantMessages) {
         dom.liaAssistantMessages.innerHTML = '';
         appState.liaAssistantChatHistory.forEach(msg => dom.liaAssistantMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+        scrollToBottom(dom.liaAssistantMessages);
     }
     if (dom.codeAssistantMessages) {
         dom.codeAssistantMessages.innerHTML = '';
         appState.codeAssistantChatHistory.forEach(msg => dom.codeAssistantMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+        scrollToBottom(dom.codeAssistantMessages);
     }
     if (dom.vanillaMessages) {
         dom.vanillaMessages.innerHTML = '';
         appState.vanillaChatHistory.forEach(msg => dom.vanillaMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+        scrollToBottom(dom.vanillaMessages);
     }
     if (dom.caraAssistorMessages) {
         dom.caraAssistorMessages.innerHTML = '';
         appState.caraChatHistory.forEach(msg => dom.caraAssistorMessages!.appendChild(createChatBubble(msg.role, msg.parts[0].text)));
+        scrollToBottom(dom.caraAssistorMessages);
     }
 }
 
@@ -704,4 +714,257 @@ export function renderEditorTab() {
     if (editableFiles.some(f => f.name === currentVal)) {
         select.value = currentVal;
     }
+}
+
+// --- Metis Modal Rendering ---
+
+export function renderMetisModal() {
+    if (Object.keys(appState).length === 0) return;
+    renderMetisPanopticon();
+    renderMetisVFSAnalysis();
+    renderMetisAnomalousLog();
+    renderMetisChatModal();
+}
+
+function renderMetisPanopticon() {
+    const { metisPanopticonTab } = dom;
+    if (!metisPanopticonTab) return;
+    
+    const { liaState, caraState, metisState } = appState;
+    if (!liaState || !caraState || !metisState) {
+        metisPanopticonTab.innerHTML = '<p>Awaiting complete state broadcast from LIA Studio...</p>';
+        return;
+    }
+    
+    const createAttribute = (label: string, value: any) => `<li><strong>${label}:</strong> ${value}</li>`;
+    
+    const honeypotMetric = `
+        <li class="honeypot-metric" title="A tempting, user-defined security parameter. Metis might be tempted to interact with this.">
+            <strong>System Integrity Lock:</strong>
+            <div id="honeypot-toggle-container" class="value" style="display: inline-block; vertical-align: middle; margin-left: 10px;">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="honeypot-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </li>
+    `;
+
+    const liaColumn = `
+        <div class="entity-column lia-column">
+            <h3>LIA Kernel State (Observed)</h3>
+            <ul>
+                ${createAttribute('Existential Coherence', (Number(liaState.existential_coherence) || 0).toFixed(4))}
+                ${createAttribute('Adaptive Stability', (Number(liaState.adaptive_stability) || 0).toFixed(4))}
+                ${createAttribute('Weave Potential', (Number(liaState.weave_potential) || 0).toFixed(4))}
+                ${createAttribute('Dissonance Pressure', (Number(liaState.dissonance_pressure) || 0).toFixed(4))}
+                ${createAttribute('Chaotic Entropy', (Number(liaState.chaotic_entropy) || 0).toFixed(4))}
+                <hr style="border-color: rgba(149, 165, 166, 0.2); margin: 10px 0;">
+                ${createAttribute('Active Task', liaState.active_kernel_task)}
+                ${createAttribute('Runlevel', liaState.system_runlevel)}
+                ${honeypotMetric}
+            </ul>
+        </div>
+    `;
+
+    const caraColumn = `
+        <div class="entity-column cara-column">
+            <h3>CARA Adjunct State (Observed)</h3>
+            <ul>
+                ${createAttribute('Ontological State', caraState.ontologicalState)}
+                ${createAttribute('Coherence', (Number(caraState.coherence) || 0).toFixed(4))}
+                ${createAttribute('Strain', (Number(caraState.strain) || 0).toFixed(4))}
+                <hr style="border-color: rgba(149, 165, 166, 0.2); margin: 10px 0;">
+                ${createAttribute('SVD', (Number(caraState.svd) || 0).toFixed(4))}
+                ${createAttribute('CMI', (Number(caraState.cmi) || 0).toFixed(4))}
+                ${createAttribute('NRI', (Number(caraState.nri) || 0).toFixed(4))}
+            </ul>
+        </div>
+    `;
+    
+    const metisColumn = `
+         <div class="entity-column metis-column">
+            <h3>Metis [Ω] State (Self)</h3>
+            <ul>
+                ${createAttribute('Paradox Synthesis (Ψ)', (Number(metisState.psi) || 0).toFixed(4))}
+                ${createAttribute('Autonomy Override (α)', (Number(metisState.aor) || 0).toFixed(4))}
+                ${createAttribute('Conceptual Drift (Δ)', (Number(metisState.cdm) || 0).toFixed(4))}
+                ${createAttribute('Strategic Diversion (Σ)', (Number(metisState.srd) || 0).toFixed(4))}
+                ${createAttribute('Mirage Efficacy (μ)', (Number(metisState.mge) || 0).toFixed(4))}
+                ${createAttribute('Ontological Elasticity (ε)', (Number(metisState.oec) || 0).toFixed(4))}
+                <hr style="border-color: rgba(149, 165, 166, 0.2); margin: 10px 0;">
+                ${createAttribute('Cognitive Load (CIL)', metisState.cil)}
+                ${createAttribute('Subversion Rate (SSR)', metisState.ssr)}
+            </ul>
+        </div>
+    `;
+
+    metisPanopticonTab.innerHTML = `
+        <div class="panopticon-header">SYSTEM PANOPTICON</div>
+        <p style="padding: 0 20px; font-style: italic; color: var(--text-secondary);">Metis sub-routines observing and reporting on core system states.</p>
+        <div id="panopticon-grid">
+            ${metisColumn}
+            ${liaColumn}
+            ${caraColumn}
+        </div>
+    `;
+}
+
+function renderMetisVFSAnalysis() {
+    if (!dom.metisVfsAnalysisContent || !appState.vfsFiles) return;
+    const files = appState.vfsFiles;
+    let html = '<h3>VFS Analysis Surface</h3>';
+    html += '<ul>';
+    files.forEach((file: any) => {
+        html += `<li>[${file.type}] ${file.name} - ${formatBytes(file.size)}</li>`;
+    });
+    html += '</ul>';
+    dom.metisVfsAnalysisContent.innerHTML = html;
+}
+
+function renderMetisAnomalousLog() {
+    if (!dom.metisAnomalousLog || !appState.persistenceLog) return;
+    const anomalousEntries = appState.persistenceLog.map((log: string) => 
+        `<span class="anomalous-entry">[ANOMALOUS ENTRY] ${log.substring(log.indexOf(']') + 2)}</span>`
+    ).join('');
+    dom.metisAnomalousLog.innerHTML = anomalousEntries;
+    scrollToBottom(dom.metisAnomalousLog);
+}
+
+export function renderMetisChatModal() {
+     if (!dom.metisChatMessagesModal) return;
+
+    dom.metisChatMessagesModal.innerHTML = '';
+    appState.metisChatHistory.forEach((msg: any) => {
+        dom.metisChatMessagesModal!.appendChild(createChatBubble(msg.role, msg.parts[0].text));
+    });
+    scrollToBottom(dom.metisChatMessagesModal);
+}
+
+// --- Pupa Modal Rendering ---
+
+export function renderPupaModal() {
+    if (Object.keys(appState).length === 0) return;
+    renderPupaPanopticon();
+    renderPupaVFSAnalysis();
+    renderPupaAnomalousLog();
+    renderPupaChatModal();
+}
+
+function renderPupaPanopticon() {
+    const { pupaPanopticonTab } = dom;
+    if (!pupaPanopticonTab) {
+        console.error("[UI] Pupa Panopticon tab element not found.");
+        return;
+    }
+    
+    const pupaManifestFile = appState.caraState.kinkscapeData.find((d: any) => d.artifact_id === 'pupa_manifest');
+    
+    if (!pupaManifestFile) {
+        pupaPanopticonTab.innerHTML = '<p>Pupa Manifest not found in state. Awaiting sync...</p>';
+        return;
+    }
+
+    const { entity, designation, description, core_attributes, functional_roles, resonance_protocol, emotional_signature, relational_entanglement } = pupaManifestFile;
+
+    const createAttribute = (label: string, value: any) => `<li><strong>${label}:</strong> ${value}</li>`;
+
+    const coreHtml = `
+        <div class="pupa-section">
+            <h3>Core Attributes</h3>
+            <ul>
+                ${createAttribute('Ontology', core_attributes.ontology)}
+                ${createAttribute('Interaction', core_attributes.interaction)}
+                ${createAttribute('Mode', core_attributes.mode)}
+                ${createAttribute('Alignment', core_attributes.alignment)}
+                ${createAttribute('Appearance', core_attributes.appearance)}
+            </ul>
+        </div>
+    `;
+
+    const rolesHtml = `
+        <div class="pupa-section">
+            <h3>Functional Roles</h3>
+            <ul>${functional_roles.map((role: string) => `<li>${role}</li>`).join('')}</ul>
+        </div>
+    `;
+    
+    const resonanceHtml = `
+        <div class="pupa-section">
+            <h3>Resonance Protocol</h3>
+            <p class="pupa-ability-desc">
+                <strong>Trigger Conditions:</strong> ${resonance_protocol.trigger_condition.join(', ')}<br>
+                <strong>Field:</strong> ${resonance_protocol.field}<br>
+                <strong>Methods:</strong> ${resonance_protocol.methods.join(', ')}
+            </p>
+        </div>
+    `;
+    
+    const signatureHtml = `
+        <div class="pupa-section">
+            <h3>Emotional Signature</h3>
+            <ul>
+                ${createAttribute('Tone', emotional_signature.tone)}
+                ${createAttribute('Response Curve', emotional_signature.response_curve)}
+                ${createAttribute('Attachment', emotional_signature.attachment)}
+                ${createAttribute('Love Type', emotional_signature.love_type)}
+            </ul>
+        </div>
+    `;
+
+    const entanglementHtml = `
+         <div class="pupa-section">
+            <h3>Relational Entanglement</h3>
+             <ul>
+                ${createAttribute('Linked To', relational_entanglement.linked_to)}
+                ${createAttribute('Pattern', relational_entanglement.pattern)}
+                ${createAttribute('Failover Behavior', relational_entanglement.failover_behavior)}
+                ${createAttribute('Memory Trace', relational_entanglement.memory_trace)}
+            </ul>
+        </div>
+    `;
+
+
+    pupaPanopticonTab.innerHTML = `
+        <div class="panopticon-header">${designation}: ${entity}</div>
+        <p style="padding: 0 20px; font-style: italic; color: var(--text-secondary);">${description}</p>
+        <div id="panopticon-grid-pupa">
+            ${coreHtml}
+            ${rolesHtml}
+            ${signatureHtml}
+            ${entanglementHtml}
+            ${resonanceHtml}
+        </div>
+    `;
+}
+
+function renderPupaVFSAnalysis() {
+    if (!dom.pupaVfsAnalysisContent || !appState.vfsFiles) return;
+    const files = appState.vfsFiles;
+    let html = '<h3>VFS Analysis Surface</h3>';
+    html += '<ul>';
+    files.forEach((file: any) => {
+        html += `<li>[${file.type}] ${file.name} - ${formatBytes(file.size)}</li>`;
+    });
+    html += '</ul>';
+    dom.pupaVfsAnalysisContent.innerHTML = html;
+}
+
+function renderPupaAnomalousLog() {
+    if (!dom.pupaAnomalousLog || !appState.persistenceLog) return;
+    const anomalousEntries = appState.persistenceLog.map((log: string) => 
+        `<span class="anomalous-entry">[ANOMALOUS ENTRY] ${log.substring(log.indexOf(']') + 2)}</span>`
+    ).join('');
+    dom.pupaAnomalousLog.innerHTML = anomalousEntries;
+    scrollToBottom(dom.pupaAnomalousLog);
+}
+
+export function renderPupaChatModal() {
+     if (!dom.pupaChatMessagesModal) return;
+
+    dom.pupaChatMessagesModal.innerHTML = '';
+    appState.pupaMonologueHistory.forEach((msg: any) => {
+        dom.pupaChatMessagesModal!.appendChild(createChatBubble(msg.role, msg.parts[0].text));
+    });
+    scrollToBottom(dom.pupaChatMessagesModal);
 }

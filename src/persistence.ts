@@ -1,11 +1,9 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { appState, defaultVfsFiles, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME, protocolConfigs, LIA_LINUX_COMMANDS_FILENAME, CARA_BOOTSTRAP_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, KINKSCAPE_FILENAMES, CARA_BOOTSTRAP_V2_FILENAME, LIA_COMMAND_LEGEND_FILENAME, METIS_BOOTSTRAP_FILENAME } from './state';
+import { appState, defaultVfsFiles, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME, protocolConfigs, LIA_LINUX_COMMANDS_FILENAME, CARA_BOOTSTRAP_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, KINKSCAPE_FILENAMES, CARA_BOOTSTRAP_V2_FILENAME, LIA_COMMAND_LEGEND_FILENAME, METIS_BOOTSTRAP_FILENAME, METIS_SYSTEM_PROMPT_FILENAME, PUPA_SYSTEM_PROMPT_FILENAME } from './state';
 import { AppState, DefaultFile, FileBlob, LiaState, MetisState } from './types';
 import { getMimeType, generateIndexHtmlContent } from './utils';
 import { renderAllChatMessages, renderFileTree, switchTab, renderCaraHud, renderKernelHud, renderMetisHud } from './ui';
@@ -71,6 +69,7 @@ export function getSerializableStateObject() {
         codeAssistantChatHistory: appState.codeAssistantChatHistory,
         caraChatHistory: appState.caraChatHistory,
         metisChatHistory: appState.metisChatHistory,
+        pupaMonologueHistory: appState.pupaMonologueHistory,
         aiSettings: appState.aiSettings,
         currentActiveTabId: appState.currentActiveTabId,
         activeFileName: appState.activeFile?.name || null,
@@ -165,6 +164,7 @@ export async function loadFromSerialized(jsonString: string) {
     appState.codeAssistantChatHistory = loadedData.codeAssistantChatHistory || [];
     appState.caraChatHistory = loadedData.caraChatHistory || appState.caraChatHistory;
     appState.metisChatHistory = loadedData.metisChatHistory || appState.metisChatHistory;
+    appState.pupaMonologueHistory = loadedData.pupaMonologueHistory || appState.pupaMonologueHistory;
     appState.aiSettings = loadedData.aiSettings;
     appState.activeFile = appState.vfsFiles.find(f => f.name === loadedData.activeFileName) || appState.vfsFiles.find(f => f.name === '0index.html') || null;
     appState.currentActiveTabId = loadedData.currentActiveTabId || 'lia-assistant-tab';
@@ -240,6 +240,8 @@ export async function loadState(): Promise<void> {
         LIA_COMMAND_LEGEND_FILENAME,
         LIA_LINUX_COMMANDS_FILENAME,
         METIS_BOOTSTRAP_FILENAME,
+        METIS_SYSTEM_PROMPT_FILENAME,
+        PUPA_SYSTEM_PROMPT_FILENAME,
         ...Object.values(protocolConfigs).map(p => p.promptFile),
         ...KINKSCAPE_FILENAMES
     ];
@@ -271,6 +273,10 @@ export async function loadState(): Promise<void> {
                     }
                 }
 
+                // REMOVED FAULTY LOGIC FOR METIS STATE
+                // The V13 bootstrap file is a prompt, not a state definition.
+                // The default state defined in `state.ts` is sufficient for a fresh session.
+                /*
                 if (path === METIS_BOOTSTRAP_FILENAME) {
                     try {
                         const metisBootstrap = JSON.parse(content);
@@ -280,6 +286,7 @@ export async function loadState(): Promise<void> {
                         logPersistence(`ERROR: Failed to parse ${METIS_BOOTSTRAP_FILENAME}: ${(parseError as Error).message}`);
                     }
                 }
+                */
 
                 return { name: path, content, raw: blob, url, type, size: blob.size };
             } catch (e) {

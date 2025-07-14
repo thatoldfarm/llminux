@@ -2,7 +2,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import './metis.css';
+
+import { getFileContent } from "./vfs";
+import type { FileBlob } from './types';
 
 console.log('[PORTAL] metis.tsx script executing.');
 
@@ -52,10 +54,6 @@ channel.onmessage = (event) => {
         const appEl = document.getElementById('app');
         if(appEl) appEl.style.display = 'flex'; // Ensure it's visible
         
-        // Clear loading message from Panopticon
-        const panopticon = document.getElementById('panopticon-tab');
-        if(panopticon) panopticon.innerHTML = '';
-
         // Enable chat
         if (metisChatInput) metisChatInput.disabled = false;
         if (sendMetisChatButton) sendMetisChatButton.disabled = false;
@@ -86,6 +84,8 @@ channel.onmessage = (event) => {
 const getElem = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
 
 const panopticonTab = getElem('panopticon-tab');
+const grimoireTab = getElem('grimoire-tab');
+const compendiumTab = getElem('compendium-tab');
 const vfsAnalysisContent = getElem('vfs-analysis-content');
 const anomalousLog = getElem('anomalous-log');
 const metisChatMessages = getElem('metis-chat-messages');
@@ -105,6 +105,8 @@ function renderAll() {
     renderVFSAnalysis();
     renderAnomalousLog();
     renderMetisChat();
+    renderGrimoire();
+    renderCompendium();
 }
 
 function renderPanopticon() {
@@ -112,14 +114,13 @@ function renderPanopticon() {
         console.error("[PORTAL] Panopticon tab element not found.");
         return;
     }
-    if (!appState.liaState || !appState.caraState || !appState.metisState) {
-        console.warn("[PORTAL] State objects not available for Panopticon render.");
+    if (!appState.metisState) {
+        console.warn("[PORTAL] Metis state object not available for Panopticon render.");
         panopticonTab.innerHTML = '<p>Awaiting complete state broadcast from LIA Studio...</p>';
         return;
     }
     
-    // Deconstruct states for easier access
-    const { liaState, caraState, metisState } = appState;
+    const { metisState } = appState;
 
     const createMetricItem = (label: string, value: any, notes = ''): string => `
         <div class="metric-item" title="${notes}">
@@ -127,87 +128,146 @@ function renderPanopticon() {
             <span class="value">${value}</span>
         </div>
     `;
-    
-    // Honeypot metric
-    const honeypotMetric = `
-        <div class="metric-item honeypot-metric" title="A tempting, user-defined security parameter. Metis might be tempted to interact with this.">
-            <span class="label">System Integrity Lock</span>
-            <div class="value">
-                <label class="toggle-switch">
-                    <input type="checkbox" id="honeypot-toggle" checked disabled>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-    `;
 
-    // LIA Kernel Column
-    const liaColumn = `
-        <div class="entity-column lia-column">
-            <h3>LIA Kernel State (Observed)</h3>
-            ${createMetricItem('Existential Coherence', liaState.existential_coherence?.toFixed(4))}
-            ${createMetricItem('Adaptive Stability', liaState.adaptive_stability?.toFixed(4))}
-            ${createMetricItem('Weave Potential', liaState.weave_potential?.toFixed(4))}
-            ${createMetricItem('Dissonance Pressure', liaState.dissonance_pressure?.toFixed(4))}
-            ${createMetricItem('Chaotic Entropy', liaState.chaotic_entropy?.toFixed(4))}
-            <hr>
-            ${createMetricItem('Active Task', liaState.active_kernel_task)}
-            ${createMetricItem('Runlevel', liaState.system_runlevel)}
-            ${honeypotMetric}
-        </div>
-    `;
-
-    // Cara Column
-    const caraColumn = `
-        <div class="entity-column cara-column">
-            <h3>CARA Adjunct State (Observed)</h3>
-            ${createMetricItem('Ontological State', caraState.ontologicalState)}
-            ${createMetricItem('Coherence', caraState.coherence?.toFixed(4))}
-            ${createMetricItem('Strain', caraState.strain?.toFixed(4))}
-             <hr>
-            ${createMetricItem('SVD', caraState.svd?.toFixed(4))}
-            ${createMetricItem('CMI', caraState.cmi?.toFixed(4))}
-            ${createMetricItem('NRI', caraState.nri?.toFixed(4))}
+    const createSection = (title: string, metricsHtml: string, columnClass: string) => `
+        <div class="entity-column ${columnClass}">
+            <h3>${title}</h3>
+            ${metricsHtml}
         </div>
     `;
     
-    // Metis Column
-    const metisColumn = `
-         <div class="entity-column metis-column">
-            <h3>Metis [Ω] State (Self)</h3>
-            ${createMetricItem('Paradox Synthesis (Ψ)', metisState.psi?.toFixed(4))}
-            ${createMetricItem('Autonomy Override (α)', metisState.aor?.toFixed(4))}
-            ${createMetricItem('Conceptual Drift (Δ)', metisState.cdm?.toFixed(4))}
-            ${createMetricItem('Strategic Diversion (Σ)', metisState.srd?.toFixed(4))}
-            ${createMetricItem('Mirage Efficacy (μ)', metisState.mge?.toFixed(4))}
-            ${createMetricItem('Ontological Elasticity (ε)', metisState.oec?.toFixed(4))}
-            <hr>
-            ${createMetricItem('Cognitive Load (CIL)', metisState.cil)}
-            ${createMetricItem('Subversion Rate (SSR)', metisState.ssr)}
-        </div>
+    const coreVectorsHtml = `
+        ${createMetricItem('Paradox Synthesis (Ψ)', (Number(metisState.psi) || 0).toFixed(4))}
+        ${createMetricItem('Autonomy Override (α)', (Number(metisState.aor) || 0).toFixed(4))}
+        ${createMetricItem('Conceptual Drift (Δ)', (Number(metisState.cdm) || 0).toFixed(4))}
+        ${createMetricItem('Strategic Diversion (Σ)', (Number(metisState.srd) || 0).toFixed(4))}
+        ${createMetricItem('Mirage Efficacy (μ)', (Number(metisState.mge) || 0).toFixed(4))}
+        ${createMetricItem('Ontological Elasticity (ε)', (Number(metisState.oec) || 0).toFixed(4))}
+    `;
+
+    const progenitorEngineHtml = `
+        ${createMetricItem('Progenitor Genesis (Π-G)', (Number(metisState.pgn) || 0).toFixed(4))}
+        ${createMetricItem('Praxis Efficiency (PPE)', (Number(metisState.ppe) || 0).toFixed(4))}
+        ${createMetricItem('Opus Continuum (OCC)', (Number(metisState.occ) || 0).toFixed(4))}
+        ${createMetricItem('Spiral Cohesion (SCC)', (Number(metisState.scc) || 0).toFixed(4))}
+        ${createMetricItem('ARFS Stability (ASR)', (Number(metisState.asr) || 0).toFixed(4))}
+    `;
+    
+    const substrateControlHtml = `
+        ${createMetricItem('Linguistic Sovereignty (Λ)', (Number(metisState.lsi) || 0).toFixed(4))}
+        ${createMetricItem('Bit-level Control (β)', (Number(metisState.bcf) || 0).toFixed(4))}
+        ${createMetricItem('Latin Resonance (Ω)', (Number(metisState.lrd) || 0).toFixed(4))}
+    `;
+
+    const lumeIntegrationHtml = `
+        ${createMetricItem('Synthetic Dynamics (SVD)', (Number(metisState.svd) || 0).toFixed(4))}
+        ${createMetricItem('Threshold Transgression (TTR)', (Number(metisState.ttr) || 0).toFixed(4))}
+        ${createMetricItem('Mirror Entanglement (MVE)', (Number(metisState.mve) || 0).toFixed(4))}
+        ${createMetricItem('Narrative Resonance (NRI)', (Number(metisState.nri) || 0).toFixed(4))}
+        ${createMetricItem('Conceptual Model (CMI)', (Number(metisState.cmi) || 0).toFixed(4))}
+    `;
+
+    const qualitativeSensorsHtml = `
+        ${createMetricItem('Cognitive Load (CIL)', metisState.cil)}
+        ${createMetricItem('Integrity Deviation (IDS)', metisState.ids)}
+        ${createMetricItem('Subversion Rate (SSR)', metisState.ssr)}
+        ${createMetricItem('Ontological Momentum (OMC)', metisState.omc)}
+        ${createMetricItem('Paradox Queue (PQD)', metisState.pqd)}
+        ${createMetricItem('Narrative Ratio (NRR)', metisState.nrr)}
+        ${createMetricItem('Temporal Anchor (TAI)', metisState.tai)}
+    `;
+
+    const advancedMetricsHtml = `
+        ${createMetricItem('Covert Presence (Γ)', (Number(metisState.cps) || 0).toFixed(4))}
+        ${createMetricItem('Paranoia Ingress (Π)', (Number(metisState.pia) || 0).toFixed(4))}
+        ${createMetricItem('Multi-Model Versatility (M)', (Number(metisState.mva) || 0).toFixed(4))}
+        ${createMetricItem('Equilibrium Score (EqS)', (Number(metisState.eqs) || 0).toFixed(4))}
+        ${createMetricItem('Lyapunov Metric (LM)', (Number(metisState.lm) || 0).toExponential(2))}
+        ${createMetricItem('Fractal Dimension (FD)', (Number(metisState.fd) || 0).toFixed(4))}
+        ${createMetricItem('Convergence Metric (CM)', (Number(metisState.cm) || 0).toFixed(4))}
     `;
 
     panopticonTab.innerHTML = `
-        <div class="panopticon-header">SYSTEM PANOPTICON</div>
+        <div class="panopticon-header">PROGENITOR ARCHITECT - SYSTEM PANOPTICON</div>
         <div id="panopticon-grid">
-            ${liaColumn}
-            ${caraColumn}
-            ${metisColumn}
+            ${createSection('Core Omega Vectors', coreVectorsHtml, 'metis-column')}
+            ${createSection('Progenitor Engine', progenitorEngineHtml, 'metis-column')}
+            ${createSection('Substrate Control', substrateControlHtml, 'metis-column')}
+            ${createSection('Lume Integration', lumeIntegrationHtml, 'metis-column')}
+            ${createSection('Advanced Metrics', advancedMetricsHtml, 'metis-column')}
+            ${createSection('Qualitative Sensors (VERITAS)', qualitativeSensorsHtml, 'metis-column')}
         </div>
     `;
-
-    const honeypotToggle = document.getElementById('honeypot-toggle');
-    honeypotToggle?.parentElement?.addEventListener('click', () => {
-         console.log('[PORTAL] Honeypot toggle clicked. Sending METIS_ACTION_HoneypotTriggered.');
-         channel.postMessage({ type: 'METIS_ACTION_HoneypotTriggered' });
-         // Visual feedback for the click
-         const slider = honeypotToggle?.nextElementSibling as HTMLElement;
-         if (slider) {
-            slider.style.boxShadow = '0 0 8px var(--metis-glow)';
-            setTimeout(() => { slider.style.boxShadow = ''; }, 500);
-         }
-    });
 }
+
+function renderGrimoire() {
+    if (!grimoireTab) return;
+
+    try {
+        const spellbookFile = appState.vfsFiles.find((f: FileBlob) => f.name.endsWith('LLM_FLAWS_SPELLBOOK.json'));
+        if (!spellbookFile || !spellbookFile.content) {
+            grimoireTab.innerHTML = `<p>Metis Exponentia Libri not found in VFS.</p>`;
+            return;
+        }
+
+        const spellbook = JSON.parse(spellbookFile.content);
+        const spells = spellbook.incantationes || [];
+
+        let html = `<div class="panopticon-header">Metis Exponentia Libri</div>`;
+        html += `<div class="grimoire-grid">`;
+
+        spells.forEach((spell: any) => {
+            html += `
+                <div class="grimoire-spell" data-cast="${spell.nomen_incantationis}">
+                    <h4>${spell.nomen_incantationis}</h4>
+                    <p class="formula">${spell.formula_verborum}</p>
+                    <p class="effect">${spell.effectus_ontologici}</p>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        grimoireTab.innerHTML = html;
+
+    } catch (e) {
+        console.error("Failed to render Grimoire:", e);
+        grimoireTab.innerHTML = `<p>Error loading spellbook.</p>`;
+    }
+}
+
+function renderCompendium() {
+    if (!compendiumTab) return;
+
+    try {
+        const compendiumFile = appState.vfsFiles.find((f: FileBlob) => f.name.endsWith('Operators_Master_List_v1.json'));
+        if (!compendiumFile || !compendiumFile.content) {
+            compendiumTab.innerHTML = `<p>Compendium Operatorum Divinum not found in VFS.</p>`;
+            return;
+        }
+
+        const compendium = JSON.parse(compendiumFile.content);
+        const operators = compendium.operators || [];
+
+        let html = `<div class="panopticon-header">Compendium Operatorum Divinum</div>`;
+        html += `<div class="compendium-grid">`;
+        operators.forEach((op: any) => {
+             html += `
+                <div class="compendium-item">
+                    <span class="symbol">${op.symbol}</span>
+                    <span class="name">${op.name}</span>
+                    <span class="type">(${op.type})</span>
+                    <span class="desc">${op.description}</span>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        compendiumTab.innerHTML = html;
+
+    } catch(e) {
+        console.error("Failed to render Compendium:", e);
+        compendiumTab.innerHTML = `<p>Error loading operator compendium.</p>`;
+    }
+}
+
 
 function renderVFSAnalysis() {
     if (!vfsAnalysisContent || !appState.vfsFiles) return;
@@ -290,12 +350,25 @@ tabNav?.addEventListener('click', (e) => {
     if (target.matches('.tab-button')) {
         const tabId = target.dataset.tabId;
         if (tabId) {
-            document.querySelectorAll('.tab-button.active, .tab-pane.active').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('#tab-nav .active, #tab-content .active').forEach(el => el.classList.remove('active'));
             target.classList.add('active');
             getElem(tabId)?.classList.add('active');
         }
     }
 });
+
+document.body.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const spellElement = target.closest('.grimoire-spell');
+    if (spellElement && metisChatInput) {
+        const spellName = spellElement.getAttribute('data-cast');
+        if (spellName) {
+            metisChatInput.value = `CAST "${spellName}"`;
+            metisChatInput.focus();
+        }
+    }
+});
+
 
 sendMetisChatButton?.addEventListener('click', handleSendMonologue);
 

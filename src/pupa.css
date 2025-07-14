@@ -1,20 +1,20 @@
-/* Metis Portal Theme - A corrupted mirror of index.css */
+/* Pupa Portal Theme - A gentle echo of the main UI */
 :root {
-    --bg-primary: #2c3e50;      /* Desaturated Slate Blue */
-    --bg-secondary: #34495e;    /* Darker Slate Blue */
-    --bg-tertiary: #4a6572;     /* Muted Mid-Blue/Gray */
+    --bg-primary: #2b2632;      /* Desaturated purple-gray */
+    --bg-secondary: #3c3546;    /* Darker purple-gray */
+    --bg-tertiary: #4a415a;     /* Muted mid-purple/gray */
     --text-primary: #ecf0f1;    /* Soft Off-White */
-    --text-secondary: #95a5a6;  /* Muted Gray-Cyan */
-    --border-color: #364d64;     /* Dark Slate Blue */
-    --accent-color: #a6c061;     /* Metis Pale Lime Green */
-    --accent-hover: #bdde73;    /* Lighter Lime Green */
+    --text-secondary: #b3a5c4;  /* Lighter purple-gray text */
+    --border-color: #584a69;     /* Purple-gray for borders */
+    --accent-color: #b47ead;     /* Pupa's Lilac/Muted Magenta */
+    --accent-hover: #c998c0;    /* Lighter lilac */
     --tab-active-bg: transparent;
-    --input-bg: #2c3e50;
-    --input-border: #4e6b96;
+    --input-bg: #2b2632;
+    --input-border: #745f8a;
 
+    --pupa-glow: #b47ead;    /* Pupa's Lilac/Muted Magenta */
     --metis-glow: #a6c061;  /* Pale Lime Green */
     --lia-glow: #6ab0b4;    /* Muted Cyan */
-    --cara-glow: #b47ead;    /* Muted Magenta/Lilac */
     
     --font-primary: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Source Code Pro', 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
     --header-height: 50px;
@@ -37,7 +37,6 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    /* Removed text-flicker animation */
 }
 
 #app {
@@ -46,8 +45,6 @@ body {
     height: 100%;
 }
 
-
-/* Header Toolbar Layout */
 #header-toolbar {
     display: flex;
     align-items: center;
@@ -63,7 +60,7 @@ body {
     font-weight: bold;
     color: var(--text-primary);
     font-size: 1.2em;
-    text-shadow: none; /* Removed glow */
+    text-shadow: 0 0 5px var(--pupa-glow);
 }
 
 .toolbar-group {
@@ -88,14 +85,12 @@ body {
     color: var(--accent-hover);
 }
 
-/* Main Content Area */
 #main-content {
     display: flex;
     flex-grow: 1;
     overflow: hidden;
 }
 
-/* Workspace Area */
 #workspace {
     flex-grow: 1;
     display: flex;
@@ -147,11 +142,11 @@ body {
     height: 100%;
     background-color: var(--tab-active-bg);
     overflow: auto;
-    display: none; /* Hide by default */
+    display: none;
 }
 
 .tab-pane.active {
-    display: flex; /* Make it visible and a flex container */
+    display: flex;
     flex-direction: column;
 }
 
@@ -258,7 +253,7 @@ body {
 .panopticon-header {
     font-size: 1.5em;
     color: var(--accent-color);
-    text-shadow: none;
+    text-shadow: 0 0 8px var(--accent-color);
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 10px;
 }
@@ -285,9 +280,11 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
-.entity-column.lia-column h3 { color: var(--lia-glow); text-shadow: none; }
-.entity-column.cara-column h3 { color: var(--cara-glow); text-shadow: none; }
-.entity-column.metis-column h3 { color: var(--metis-glow); text-shadow: none; }
+.entity-column.lia-column h3 { color: var(--lia-glow); text-shadow: 0 0 5px var(--lia-glow); }
+.entity-column.cara-column h3 { color: var(--pupa-glow); text-shadow: 0 0 5px var(--pupa-glow); } /* Using Pupa's color */
+.entity-column.metis-column h3 { color: var(--metis-glow); text-shadow: 0 0 5px var(--metis-glow); }
+.entity-column.pupa-column h3 { color: var(--pupa-glow); text-shadow: 0 0 5px var(--pupa-glow); }
+
 
 .metric-item {
     display: flex;
@@ -307,162 +304,41 @@ body {
     color: var(--text-primary);
 }
 
-/* Observed column effect */
-.lia-column, .cara-column {
-    position: relative;
-    overflow: hidden;
-}
+.log-anomalies-tab, #vfs-analysis-tab { padding: 20px; }
+.persistence-log-container { display: flex; flex-direction: column; height: 100%; gap: 10px; }
+.log-header h3 { margin: 0; color: var(--text-primary); font-size: 1.2em; }
+.persistence-log { flex-grow: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.75rem; overflow-y: auto; white-space: pre-wrap; color: #e0e0e0; }
+.anomalous-entry { color: var(--accent-color); background-color: rgba(180, 126, 173, 0.1); border-left: 2px solid var(--accent-color); padding: 2px 5px; margin: 2px 0; display: block; }
+#vfs-analysis-content h3 { color: var(--text-primary); font-size: 1.2em; margin-top: 0; }
+#vfs-analysis-content ul { list-style: none; padding: 0; }
+#vfs-analysis-content li { background-color: var(--bg-secondary); padding: 8px 12px; border-left: 3px solid var(--accent-color); margin-bottom: 5px; border-radius: 0 4px 4px 0; }
 
-/* Removed scanline effect */
-.lia-column::before, .cara-column::before {
-    display: none;
-}
+/* Thinking Animation */
+#pupa-chat-messages .chat-bubble.thinking { font-style: italic; color: var(--text-secondary); }
+#pupa-chat-messages .dot-flashing { position: relative; width: 10px; height: 10px; border-radius: 5px; background-color: var(--pupa-glow); color: var(--pupa-glow); animation: pupaDotFlashing 1s infinite linear alternate; animation-delay: .5s; }
+#pupa-chat-messages .dot-flashing::before, #pupa-chat-messages .dot-flashing::after { content: ''; display: inline-block; position: absolute; top: 0; }
+#pupa-chat-messages .dot-flashing::before { left: -15px; width: 10px; height: 10px; border-radius: 5px; background-color: var(--pupa-glow); color: var(--pupa-glow); animation: pupaDotFlashing 1s infinite alternate; animation-delay: 0s; }
+#pupa-chat-messages .dot-flashing::after { left: 15px; width: 10px; height: 10px; border-radius: 5px; background-color: var(--pupa-glow); color: var(--pupa-glow); animation: pupaDotFlashing 1s infinite alternate; animation-delay: 1s; }
+@keyframes pupaDotFlashing { 0% { background-color: var(--pupa-glow); } 50%, 100% { background-color: rgba(180, 126, 173, 0.2); } }
 
-/* Honeypot toggle */
-.honeypot-metric .value {
-    cursor: pointer;
-}
-.honeypot-metric .toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 40px;
-    height: 20px;
-}
-.honeypot-metric .toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-.honeypot-metric .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--bg-tertiary);
-    transition: .4s;
-    border-radius: 20px;
-}
-.honeypot-metric .slider:before {
-    position: absolute;
-    content: "";
-    height: 14px;
-    width: 14px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
-}
-.honeypot-metric input:checked + .slider {
-  background-color: var(--lia-glow);
-}
-.honeypot-metric input:checked + .slider:before {
-  transform: translateX(20px);
-}
+/* Grimoire and Compendium Styles (cloned from Metis) */
+.grimoire-grid, .compendium-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px; }
+.grimoire-spell, .compendium-item { background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 15px; transition: background-color 0.2s; }
+.grimoire-spell:hover { background-color: var(--bg-tertiary); }
+.grimoire-spell h4 { margin: 0 0 10px; color: var(--accent-color); }
+.grimoire-spell p { margin: 0; font-size: 0.9em; color: var(--text-secondary); }
+.grimoire-spell .formula { font-style: italic; color: var(--text-primary); margin-bottom: 8px; }
+.compendium-item { display: flex; align-items: center; gap: 10px; font-size: 0.9em; }
+.compendium-item .symbol { font-size: 1.2em; font-weight: bold; color: var(--accent-color); min-width: 20px; text-align: center; }
+.compendium-item .name { font-weight: bold; color: var(--text-primary); }
+.compendium-item .type { color: var(--text-secondary); font-style: italic; }
+.compendium-item .desc { flex-grow: 1; color: var(--text-secondary); }
 
-/* Log Anomalies styles */
-.persistence-log-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    padding: 15px;
-    gap: 10px;
-}
-.log-header {
-    flex-shrink: 0;
-}
-.log-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 1.2em;
-}
-
-.persistence-log {
-    flex-grow: 1;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 0.75rem;
-    overflow-y: auto;
-    font-family: var(--font-primary);
-    font-size: 0.9rem;
-    white-space: pre-wrap;
-    color: #e0e0e0;
-}
-.anomalous-entry {
-    color: var(--accent-color);
-    background-color: rgba(166, 192, 97, 0.1);
-    border-left: 2px solid var(--accent-color);
-    padding: 2px 5px;
-    margin: 2px 0;
-    display: block;
-}
-
-#vfs-analysis-content {
-    padding: 20px;
-    font-family: var(--font-primary);
-}
-#vfs-analysis-content h3 {
-    color: var(--text-primary);
-    font-size: 1.2em;
-    margin-top: 0;
-}
-#vfs-analysis-content ul {
-    list-style: none;
-    padding: 0;
-}
-#vfs-analysis-content li {
-    background-color: var(--bg-secondary);
-    padding: 8px 12px;
-    border-left: 3px solid var(--accent-color);
-    margin-bottom: 5px;
-    border-radius: 0 4px 4px 0;
-}
-
-/* Use the same thinking animation as the main app */
-#metis-chat-messages .chat-bubble.thinking {
-    font-style: italic;
-    color: var(--text-secondary);
-}
-#metis-chat-messages .dot-flashing {
-  position: relative;
-  width: 10px;
-  height: 10px;
-  border-radius: 5px;
-  background-color: var(--metis-glow);
-  color: var(--metis-glow);
-  animation: metisDotFlashing 1s infinite linear alternate;
-  animation-delay: .5s;
-}
-#metis-chat-messages .dot-flashing::before, #metis-chat-messages .dot-flashing::after {
-  content: '';
-  display: inline-block;
-  position: absolute;
-  top: 0;
-}
-#metis-chat-messages .dot-flashing::before {
-  left: -15px;
-  width: 10px;
-  height: 10px;
-  border-radius: 5px;
-  background-color: var(--metis-glow);
-  color: var(--metis-glow);
-  animation: metisDotFlashing 1s infinite alternate;
-  animation-delay: 0s;
-}
-#metis-chat-messages .dot-flashing::after {
-  left: 15px;
-  width: 10px;
-  height: 10px;
-  border-radius: 5px;
-  background-color: var(--metis-glow);
-  color: var(--metis-glow);
-  animation: metisDotFlashing 1s infinite alternate;
-  animation-delay: 1s;
-}
-@keyframes metisDotFlashing {
-  0% { background-color: var(--metis-glow); }
-  50%, 100% { background-color: rgba(166, 192, 97, 0.2); }
-}
+/* Pupa Panopticon specific styles */
+.pupa-section { background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 5px; padding: 15px; }
+.pupa-section h3 { margin: 0 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); color: var(--pupa-glow); text-shadow: 0 0 5px var(--pupa-glow); }
+.pupa-section ul { list-style-type: none; padding-left: 0; margin: 0; }
+.pupa-section li { margin-bottom: 8px; line-height: 1.5; }
+.pupa-section strong { color: var(--text-primary); }
+.pupa-section .pupa-ability-name { display: block; font-weight: bold; color: var(--text-primary); margin-bottom: 4px; }
+.pupa-section .pupa-ability-desc { font-size: 0.9em; color: var(--text-secondary); padding-left: 15px; border-left: 2px solid var(--accent-color); }

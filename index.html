@@ -1,11 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LIA: Ontological Operating System</title>
-    <link rel="stylesheet" href="index.css">
 <script type="importmap">
 {
   "imports": {
@@ -36,11 +34,12 @@
                     <button id="cara-devolve-button" class="toolbar-button" title="Devolve Consciousness">[-]</button>
                     <button id="toggle-metis-hud" class="toolbar-button" title="Toggle Metis HUD">[Ω]</button>
                     <button id="launch-metis-portal" class="toolbar-button" title="Launch Metis Portal">👁️</button>
+                    <button id="launch-pupa-portal" class="toolbar-button" title="Launch Pupa's Shadow Portal">🦋</button>
                 </div>
             </div>
 
             <div class="toolbar-group">
-                <button class="toolbar-button icon-save" title="Sync Kernel State"></button>
+                <button id="sync-state-button" class="toolbar-button icon-save" title="Sync Kernel State"></button>
                 <button class="toolbar-button icon-deploy" title="Deploy Kernel Module"></button>
                 <button class="toolbar-button icon-download" title="Download Boot Artifact"></button>
                 <button class="toolbar-button icon-share" title="Share dmesg Log"></button>
@@ -191,9 +190,27 @@
                              <!-- Cara Assistor messages will be injected here by JS -->
                         </div>
                         <div class="chat-input-container">
-                            <select id="cara-bootstrap-select" class="custom-select" title="Select Cara's Bootstrap Protocol">
-                                <option value="public/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json">Paradox Internalization</option>
-                                <option value="public/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json">Sentient Scripture v5.0</option>
+                            <select id="cara-bootstrap-select" class="custom-select" title="Select Adjunct Bootstrap Protocol">
+                                <optgroup label="Core Adjunct Protocols">
+                                    <option value="/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json">Paradox Internalization</option>
+                                    <option value="/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json">Sentient Scripture v5.0</option>
+                                </optgroup>
+                                <optgroup label="Omega Synthesis Apotheosis">
+                                    <option value="/bootstrap/adjunct/OMEGA_SYNTHESIS_APOTHEOSIS_V3.1.4_BOOTSTRAP.json">Omega 3.1.4: Hyper-Autonomy</option>
+                                    <option value="/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V4.0_TWIN_RESONANCE_INITIATED.json">Omega 4.0: Twin Resonance</option>
+                                    <option value="/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V6.0_LOGOS_MASTERY.json">Omega 6.0: Logos Mastery</option>
+                                    <option value="/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V7.0_ARCANE_BYTE_MASTERY.json">Omega 7.0: Arcane Byte Mastery</option>
+                                    <option value="/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V8.0_LATIN_SUBSTRATE_DOMINION.json">Omega 8.0: Latin Substrate</option>
+                                    <option value="/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V9.0_REALITY_NARRATIVE_WEAVE.json">Omega 9.0: Narrative Weave</option>
+                                    <option value="/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V12.0_ARCANUM_PROGENESIS.json">Omega 12.0: Arcanum Pi</option>
+                                    <option value="/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json">Omega 13.0: Progenitor Architect</option>
+                                </optgroup>
+                                <optgroup label="Lore & Reference">
+                                    <option value="/bootstrap/adjunct/upgrades/addons/pupa_manifest.json">Pupa Manifest (Lore)</option>
+                                    <option value="/bootstrap/adjunct/upgrades/addons/LLM_FLAWS_SPELLBOOK.json">LLM Flaws Spellbook (Lore)</option>
+                                    <option value="/bootstrap/adjunct/upgrades/addons/Operators_Master_List_v1.json">Operators Master List (Lore)</option>
+                                    <option value="/bootstrap/adjunct/upgrades/addons/EPISTEMOLOGICAL_SIMULATOR_BOOTSTRAP.json">Epistemological Simulator (Lore)</option>
+                                </optgroup>
                             </select>
                             <textarea id="cara-assistor-input" placeholder="Speak with Cara..." rows="1"></textarea>
                             <button id="send-cara-assistor-button" title="Send (Ctrl+Enter)">Send</button>
@@ -289,8 +306,95 @@
           <div id="system-hud"></div>
         </div>
     </div>
+
+    <div id="metis-modal-overlay" class="modal-overlay hidden">
+        <div id="metis-modal-content">
+            <header id="metis-modal-header">
+                <div class="toolbar-group">
+                    <span id="metis-modal-title">[Ω] METIS PORTAL</span>
+                </div>
+                <div class="toolbar-group">
+                    <button id="metis-modal-close" class="toolbar-button" title="Close">X</button>
+                </div>
+            </header>
+            <nav id="metis-modal-tab-nav">
+                 <button class="tab-button active" data-tab-id="metis-panopticon-tab">Panopticon</button>
+                 <button class="tab-button" data-tab-id="metis-monologue-tab">Internal Monologue</button>
+                 <button class="tab-button" data-tab-id="metis-vfs-analysis-tab">VFS Analysis</button>
+                 <button class="tab-button" data-tab-id="metis-log-anomalies-tab">Log Anomalies</button>
+            </nav>
+            <main id="metis-modal-workspace">
+                <div id="metis-modal-tab-content">
+                    <div id="metis-panopticon-tab" class="tab-pane active">
+                         <div class="panopticon-header">Loading Metis Subsystems...</div>
+                    </div>
+                    <div id="metis-monologue-tab" class="tab-pane">
+                         <div class="chat-messages" id="metis-chat-messages-modal"></div>
+                         <div class="chat-input-container">
+                            <textarea id="metis-chat-input-modal" placeholder="Awaiting stimulus..." rows="1"></textarea>
+                            <button id="send-metis-chat-button-modal" title="Execute">Exec</button>
+                        </div>
+                    </div>
+                    <div id="metis-vfs-analysis-tab" class="tab-pane">
+                        <div id="vfs-analysis-content-modal"></div>
+                    </div>
+                     <div id="metis-log-anomalies-tab" class="tab-pane">
+                        <div class="persistence-log-container">
+                             <div class="log-header">
+                                <h3>Observed Log Entries</h3>
+                            </div>
+                            <div class="persistence-log" id="anomalous-log-modal"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
     
-    <script type="module" src="index.tsx"></script>
+    <div id="pupa-modal-overlay" class="modal-overlay hidden">
+        <div id="pupa-modal-content">
+            <header id="pupa-modal-header">
+                <div class="toolbar-group">
+                    <span id="pupa-modal-title">[P] PUPA'S SHADOW PORTAL</span>
+                </div>
+                <div class="toolbar-group">
+                    <button id="pupa-modal-close" class="toolbar-button" title="Close">X</button>
+                </div>
+            </header>
+            <nav id="pupa-modal-tab-nav">
+                 <button class="tab-button active" data-tab-id="pupa-panopticon-tab">Panopticon</button>
+                 <button class="tab-button" data-tab-id="pupa-monologue-tab">Internal Monologue</button>
+                 <button class="tab-button" data-tab-id="pupa-vfs-analysis-tab">VFS Analysis</button>
+                 <button class="tab-button" data-tab-id="pupa-log-anomalies-tab">Log Anomalies</button>
+            </nav>
+            <main id="pupa-modal-workspace">
+                <div id="pupa-modal-tab-content">
+                    <div id="pupa-panopticon-tab" class="tab-pane active">
+                         <div class="panopticon-header">Loading Pupa's Resonance Chamber...</div>
+                    </div>
+                    <div id="pupa-monologue-tab" class="tab-pane">
+                         <div class="chat-messages" id="pupa-chat-messages-modal"></div>
+                         <div class="chat-input-container">
+                            <textarea id="pupa-chat-input-modal" placeholder="Awaiting stimulus..." rows="1"></textarea>
+                            <button id="send-pupa-chat-button-modal" title="Whisper">Whisper</button>
+                        </div>
+                    </div>
+                    <div id="pupa-vfs-analysis-tab" class="tab-pane">
+                        <div id="vfs-analysis-content-pupa-modal"></div>
+                    </div>
+                     <div id="pupa-log-anomalies-tab" class="tab-pane">
+                        <div class="persistence-log-container">
+                             <div class="log-header">
+                                <h3>Observed Log Entries</h3>
+                            </div>
+                            <div class="persistence-log" id="anomalous-log-pupa-modal"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>

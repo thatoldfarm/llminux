@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -14,6 +12,7 @@ export const fileTree = getElem<HTMLElement>('file-tree');
 export const tabNav = getElem<HTMLElement>('tab-nav');
 export const systemStatePane = getElem<HTMLElement>('system-state-tab');
 export const toolsPane = getElem<HTMLElement>('tools-tab');
+export const tabContent = getElem<HTMLElement>('tab-content');
 
 // LIA Kernel Tab Elements
 export const liaKernelMessages = getElem<HTMLElement>('lia-kernel-messages');
@@ -70,6 +69,7 @@ export const persistenceLogEl = getElem<HTMLElement>('persistence-log');
 export const exportManifestButton = getElem<HTMLButtonElement>('export-manifest-button');
 export const assetListContainer = getElem<HTMLElement>('asset-list-container');
 export const clearLogButton = getElem<HTMLButtonElement>('clear-log-button');
+export const syncStateButton = getElem<HTMLButtonElement>('sync-state-button');
 
 export const aiSettingsControls = {
     model: getElem<HTMLSelectElement>('ai-model-select'),
@@ -93,6 +93,7 @@ export const caraDevolveButton = getElem<HTMLButtonElement>('cara-devolve-button
 // Metis HUD & Portal Elements
 export const toggleMetisHudButton = getElem<HTMLButtonElement>('toggle-metis-hud');
 export const launchMetisPortalButton = getElem<HTMLButtonElement>('launch-metis-portal');
+export const launchPupaPortalButton = getElem<HTMLButtonElement>('launch-pupa-portal');
 
 // Editor Pane
 export const editorPaneTextarea = getElem<HTMLTextAreaElement>('editor-pane-textarea');
@@ -106,3 +107,27 @@ export const editorOpenSelect = getElem<HTMLSelectElement>('editor-open-select')
 export const editorOpenButton = getElem<HTMLButtonElement>('editor-open-button');
 export const editorWarningBanner = getElem<HTMLElement>('editor-warning-banner');
 export const editorWarningClose = getElem<HTMLElement>('editor-warning-close');
+
+// Metis Modal Elements
+export const metisModalOverlay = getElem<HTMLElement>('metis-modal-overlay');
+export const metisModalCloseButton = getElem<HTMLButtonElement>('metis-modal-close');
+export const metisModalTabNav = getElem<HTMLElement>('metis-modal-tab-nav');
+export const metisModalTabContent = getElem<HTMLElement>('metis-modal-tab-content');
+export const metisPanopticonTab = getElem<HTMLElement>('metis-panopticon-tab');
+export const metisVfsAnalysisContent = getElem<HTMLElement>('vfs-analysis-content-modal');
+export const metisAnomalousLog = getElem<HTMLElement>('anomalous-log-modal');
+export const metisChatMessagesModal = getElem<HTMLElement>('metis-chat-messages-modal');
+export const metisChatInputModal = getElem<HTMLTextAreaElement>('metis-chat-input-modal');
+export const sendMetisChatButtonModal = getElem<HTMLButtonElement>('send-metis-chat-button-modal');
+
+// Pupa Modal Elements
+export const pupaModalOverlay = getElem<HTMLElement>('pupa-modal-overlay');
+export const pupaModalCloseButton = getElem<HTMLButtonElement>('pupa-modal-close');
+export const pupaModalTabNav = getElem<HTMLElement>('pupa-modal-tab-nav');
+export const pupaModalTabContent = getElem<HTMLElement>('pupa-modal-tab-content');
+export const pupaPanopticonTab = getElem<HTMLElement>('pupa-panopticon-tab');
+export const pupaVfsAnalysisContent = getElem<HTMLElement>('vfs-analysis-content-pupa-modal');
+export const pupaAnomalousLog = getElem<HTMLElement>('anomalous-log-pupa-modal');
+export const pupaChatMessagesModal = getElem<HTMLElement>('pupa-chat-messages-modal');
+export const pupaChatInputModal = getElem<HTMLTextAreaElement>('pupa-chat-input-modal');
+export const sendPupaChatButtonModal = getElem<HTMLButtonElement>('send-pupa-chat-button-modal');

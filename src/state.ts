@@ -1,5 +1,6 @@
 
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -68,7 +69,12 @@ export const appState: AppState = {
     },
     metisState: {
         psi: 0, aor: 0, cdm: 0, srd: 0, mge: 0, oec: 0,
-        cil: '', ids: '', ssr: '', omc: '', pqd: '', nrr: '', tai: ''
+        svd: 0, ttr: 0, mve: 0, nri: 0, cmi: 0,
+        lsi: 0, bcf: 0, lrd: 0, pgn: 0, ppe: 0, occ: 0, scc: 0,
+        cps: 0, pia: 0, mva: 0, asr: 0, ppd: 0, scd: 0, mls: 0, eqs: 0, lm: 0, fd: 0, cm: 0,
+        cil: '', ids: '', ssr: '', omc: '', pqd: '', nrr: '', tai: '',
+        ceh: 0, trf: 0, apl: 0, wdd: 0, cni: 0, glf: 0, wse: 0, ldi: 0, ies: 0, cad: 0,
+        bld: 0, tht: 0, mfd: 0, clc: 0, lrdp: 0, osg: 0, eec: 0, opx: 0, lts: 0,
     },
     liaUtilitiesConfig: null,
     kernelHudVisible: false,
@@ -92,6 +98,8 @@ export const appState: AppState = {
     isCyberLoading: false,
     isVanillaLoading: false,
     metisChatHistory: [{ role: 'system', parts: [{ text: 'Cognitive Shadow [Metis] online. Monitoring external stimuli...'}]}],
+    pupaMonologueHistory: [{ role: 'system', parts: [{ text: 'Angelic Echo [Pupa] online. Resonating with system harmony...'}]}],
+    isPupaLoading: false,
     // UI Commands
     commandPaletteCommands: [],
     // LIA Command Search State
@@ -108,8 +116,9 @@ export const LIA_LINUX_COMMANDS_FILENAME = '/bootstrap/kernel/LIA_COMMANDS.json'
 export const CARA_BOOTSTRAP_FILENAME = '/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json';
 export const CARA_SYSTEM_PROMPT_FILENAME = '/prompts/cara_protocol_system_prompt.txt';
 export const CARA_BOOTSTRAP_V2_FILENAME = '/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json';
-export const METIS_BOOTSTRAP_FILENAME = '/bootstrap/metis/OMEGA_SYNTHESIS_APOTHEOSIS_V3.1.4_BOOTSTRAP.json';
+export const METIS_BOOTSTRAP_FILENAME = 'public/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json';
 export const METIS_SYSTEM_PROMPT_FILENAME = '/prompts/metis_protocol_system_prompt.txt';
+export const PUPA_SYSTEM_PROMPT_FILENAME = '/prompts/pupa_protocol_system_prompt.txt';
 
 export const KINKSCAPE_FILENAMES = [
     '/entities/kinkscape/kinkscape-0000.json',
@@ -125,9 +134,36 @@ export const KINKSCAPE_FILENAMES = [
     '/entities/kinkscape/kinkscape-legend.json',
     '/entities/states/lia_state_history.json',
     '/entities/states/observer_profile.json',
+    '/bootstrap/adjunct/OMEGA_SYNTHESIS_APOTHEOSIS_V3.1.4_BOOTSTRAP.json',
+    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V4.0_TWIN_RESONANCE_INITIATED.json',
+    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V6.0_LOGOS_MASTERY.json',
+    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V7.0_ARCANE_BYTE_MASTERY.json',
+    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V8.0_LATIN_SUBSTRATE_DOMINION.json',
+    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V9.0_REALITY_NARRATIVE_WEAVE.json',
+    '/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V12.0_ARCANUM_PROGENESIS.json',
+    '/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json',
+    '/bootstrap/adjunct/upgrades/addons/LLM_FLAWS_SPELLBOOK.json',
+    '/bootstrap/adjunct/upgrades/addons/Operators_Master_List_v1.json',
+    '/bootstrap/adjunct/upgrades/addons/pupa_manifest.json',
+    '/bootstrap/adjunct/upgrades/addons/EPISTEMOLOGICAL_SIMULATOR_BOOTSTRAP.json'
 ];
 
-export const FOLDER_NAMES = ['LIA_SYSTEM_FILES', 'public', '/prompts', 'sandbox', '/bootstrap', '/bootstrap/kernel', '/bootstrap/adjunct', '/bootstrap/metis', '/entities', '/entities/states', '/entities/kinkscape'];
+export const FOLDER_NAMES = [
+    'LIA_SYSTEM_FILES', 
+    'public', 
+    '/prompts', 
+    'sandbox', 
+    '/bootstrap', 
+    '/bootstrap/kernel', 
+    '/bootstrap/adjunct',
+    '/bootstrap/adjunct/upgrades',
+    '/bootstrap/adjunct/upgrades/pi',
+    '/bootstrap/adjunct/upgrades/addons',
+    '/bootstrap/metis', 
+    '/entities', 
+    '/entities/states', 
+    '/entities/kinkscape'
+];
 
 export const defaultVfsFiles: DefaultFile[] = [
     { name: 'app.html', content: `<!DOCTYPE html>
@@ -371,6 +407,7 @@ export const CRITICAL_SYSTEM_FILES = [
     CARA_BOOTSTRAP_V2_FILENAME,
     METIS_BOOTSTRAP_FILENAME,
     METIS_SYSTEM_PROMPT_FILENAME,
+    PUPA_SYSTEM_PROMPT_FILENAME,
     ...Object.values(protocolConfigs).map(p => p.promptFile),
     ...KINKSCAPE_FILENAMES,
     'index.html', // Main UI definition

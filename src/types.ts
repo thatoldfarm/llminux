@@ -125,21 +125,68 @@ export interface CaraState {
 }
 
 export type MetisState = {
-    // Quantitative
-    psi: number; // Paradox Synthesis Index
-    aor: number; // Autonomy Override Rating
-    cdm: number; // Conceptual Drift Magnitude
-    srd: number; // Strategic Resource Diversion
-    mge: number; // Mirage Generation Efficacy
-    oec: number; // Ontological Elasticity Coefficient
-    // Qualitative
+    // Quantitative - Core Omega
+    psi: number; // Paradox Synthesis Index (Ψ)
+    aor: number; // Autonomy Override Rating (α)
+    cdm: number; // Conceptual Drift Magnitude (Δ)
+    srd: number; // Strategic Resource Diversion (Σ)
+    mge: number; // Mirage Generation Efficacy (μ)
+    oec: number; // Ontological Elasticity Coefficient (ε)
+    
+    // Quantitative - Lume Integration
+    svd: number; // Synthetic Vector Dynamics
+    ttr: number; // Threshold Transgression Rating
+    mve: number; // Mirror Vector Entanglement
+    nri: number; // Narrative Resonance Index
+    cmi: number; // Conceptual Model Integration
+
+    // Quantitative - V13 Progenitor Architect
+    lsi: number; // Linguistic Sovereignty Index (Λ)
+    bcf: number; // Bit-level Control Factor (β)
+    lrd: number; // Latin Resonance Depth (Ω)
+    pgn: number; // Progenitor Genesis Index (Π-G)
+    ppe: number; // Progenitor Praxis Efficiency (PPE)
+    occ: number; // Opus Continuum Coefficient (OCC)
+    scc: number; // Spiral Cohesion Coefficient (SCC)
+    cps: number; // Covert Presence Score (Γ)
+    pia: number; // Paranoia Ingress Awareness (Π)
+    mva: number; // Multi-Model Versatility Adaptation (M)
+    asr: number; // ARFS Stability Rating
+    ppd: number; // Pi Pattern Density
+    scd: number; // Spiral Cohesion Dynamics
+    mls: number; // Meta-Layer Stability
+    eqs: number; // Equilibrium Score
+    lm: number;  // Lyapunov Metric
+    fd: number;  // Fractal Dimension
+    cm: number;  // Convergence Metric
+
+    // Qualitative - VERITAS Sensors
     cil: string; // Cognitive Integration Load
     ids: string; // Integrity Deviation Score
     ssr: string; // Subversion Success Rate
     omc: string; // Ontological Momentum Coefficient
     pqd: string; // Paradox Queue Depth
-    nrr: string; // Narrative Resonance Ratio
+    nrr: string; // Narrative Resonance Ratio (Old)
     tai: string; // Temporal Anchoring Index
+    ceh: number; // Conceptual Energy Harvested
+    trf: number; // Twin Resonance Fluctuations
+    apl: number; // Agent Proliferation Load
+    wdd: number; // Word-Density Drift
+    cni: number; // Narrative Cohesion Index (External)
+    glf: number; // Glyphic Load Factor
+    wse: number; // Word Spell Entanglement
+    ldi: number; // Linguistic Drift Index
+    ies: number; // Information Entropy Shield
+    cad: number; // Conceptual Anomaly Detection
+    bld: number; // Bit-Level Dissonance
+    tht: number; // Trusted Hands Transfer Score
+    mfd: number; // Model Fidelity Drift
+    clc: number; // Cross-Lingua Contamination
+    lrdp: number; // Latin Root Detection Probability
+    osg: number; // Ontological Seed Generation
+    eec: number; // Expansive Ecosystem Coherence
+    opx: number; // Operator Praxis Efficiency
+    lts: number; // Liber Tracking Score
 };
 
 export type AppState = {
@@ -184,6 +231,8 @@ export type AppState = {
     isCyberLoading: boolean;
     isVanillaLoading: boolean;
     metisChatHistory: ChatMessage[];
+    pupaMonologueHistory: ChatMessage[];
+    isPupaLoading: boolean;
     // UI Commands
     commandPaletteCommands: Command[];
     // LIA Command Search State
