@@ -549,28 +549,33 @@ export async function switchTab(tabId: string) {
 }
 
 async function renderActiveTabContent(tabId: string = appState.currentActiveTabId) {
-    const chatConfig = CHAT_TAB_CONFIG[tabId as keyof typeof CHAT_TAB_CONFIG];
+    try {
+        const chatConfig = CHAT_TAB_CONFIG[tabId as keyof typeof CHAT_TAB_CONFIG];
 
-    if (chatConfig) {
-        renderChat(chatConfig.messagesEl(), chatConfig.getHistory());
-        if (tabId === 'assistor-tab') {
-            renderCaraHud();
+        if (chatConfig) {
+            renderChat(chatConfig.messagesEl(), chatConfig.getHistory());
+            if (tabId === 'assistor-tab') {
+                renderCaraHud();
+            }
+        } else {
+            switch (tabId) {
+                case 'system-state-tab': await renderSystemState(false); break;
+                case 'persist-tab': renderAssetManager(); break;
+                case 'tools-tab': renderToolsTab(); break;
+                case 'log-tab': renderPersistenceLog(); break;
+                case 'search-tab': await renderSearchTab(); break;
+                case 'code-editor-tab':
+                    if (appState.activeFilePath && dom.codeEditor) {
+                        dom.codeEditor.value = await getFileContentAsText(appState.activeFilePath) ?? '';
+                    }
+                    break;
+                case 'vfs-shell-tab': if (dom.vfsShellOutput) scrollToBottom(dom.vfsShellOutput); break;
+                case 'editor-tab': renderEditorTab(); break;
+            }
         }
-    } else {
-        switch (tabId) {
-            case 'system-state-tab': await renderSystemState(false); break;
-            case 'persist-tab': renderAssetManager(); break;
-            case 'tools-tab': renderToolsTab(); break;
-            case 'log-tab': renderPersistenceLog(); break;
-            case 'search-tab': await renderSearchTab(); break;
-            case 'code-editor-tab': 
-                if(appState.activeFilePath && dom.codeEditor) {
-                     dom.codeEditor.value = await getFileContentAsText(appState.activeFilePath) ?? '';
-                }
-                break;
-            case 'vfs-shell-tab': if (dom.vfsShellOutput) scrollToBottom(dom.vfsShellOutput); break;
-            case 'editor-tab': renderEditorTab(); break;
-        }
+    } catch (e) {
+        console.error(`Failed to render content for tab ${tabId}:`, e);
+        // Optionally, display an error message in the UI
     }
 }
 
