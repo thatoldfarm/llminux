@@ -5,12 +5,12 @@
 import { marked } from "https://esm.run/marked";
 import DOMPurify from "https://esm.run/dompurify";
 
-import { appState, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME } from './state';
+import { appState, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME } from './state';
 import { AppState, StateDefinition, ChatMessage, Command } from './types';
 import * as dom from './dom';
 import { getAllStatesFromBootstrap } from "./services";
 import { renderPersistenceLog, renderAssetManager } from "./persistence";
-import { autoExpandTextarea, formatBytes, scrollToBottom } from "./utils";
+import { autoExpandTextarea, formatBytes, scrollToBottom, parseJsonc } from "./utils";
 import { getFileContentAsText } from './vfs';
 
 // --- UTILITIES & HELPERS ---
@@ -90,11 +90,18 @@ export function renderAllChatMessages() {
 // --- UI COMPONENT RENDERERS ---
 
 export async function renderSystemState(isDelta: boolean) {
-    if (!dom.systemStatePane) return;
+    if (!dom.systemStatePane) {
+        console.warn("[Debug][renderSystemState] systemStatePane not found. Aborting.");
+        return;
+    }
 
     try {
         const allStates: StateDefinition[] = await getAllStatesFromBootstrap();
-        if (!dom.systemStatePane.querySelector('#reset-state-button')) {
+        if (!allStates) {
+            throw new Error("Failed to get state definitions from bootstrap.");
+        }
+        
+        if (dom.systemStatePane.innerHTML.trim() === '' || !dom.systemStatePane.querySelector('#reset-state-button')) {
             dom.systemStatePane.innerHTML = `
                 <div class="system-state-header">
                     <h2>LIA Kernel Metrics</h2>
@@ -108,14 +115,20 @@ export async function renderSystemState(isDelta: boolean) {
         }
         const quantitativeGrid = dom.systemStatePane.querySelector('#system-state-grid');
         const qualitativeGrid = dom.systemStatePane.querySelector('#qualitative-state-grid');
-        if (!quantitativeGrid || !qualitativeGrid) return;
+        if (!quantitativeGrid || !qualitativeGrid) {
+            console.error("[Debug][renderSystemState] Grids not found after innerHTML set.");
+            return;
+        }
 
         quantitativeGrid.innerHTML = '';
         qualitativeGrid.innerHTML = '';
 
-        allStates.forEach(state => {
+        allStates.forEach((state, index) => {
             const value = appState.liaState[state.id];
-            if (value === undefined) return;
+            if (value === undefined) {
+                console.warn(`[Debug][renderSystemState] State ID "${state.id}" not found in appState.liaState. Skipping.`);
+                return;
+            }
             const stateEl = document.createElement('div');
             if ('range' in state && state.range) {
                 stateEl.className = 'state-metric';
@@ -153,12 +166,14 @@ export async function renderSystemState(isDelta: boolean) {
             }
         });
     } catch (e) {
-        console.error("Error rendering system state:", e);
+        const error = e as Error;
+        console.error("Error rendering system state:", error.message, error.stack);
         if (dom.systemStatePane) {
-            dom.systemStatePane.innerHTML = `<div class="error-bubble">A critical error occurred while rendering kernel metrics. Check console for details.</div>`;
+            dom.systemStatePane.innerHTML = `<div class="error-bubble">A critical error occurred while rendering kernel metrics. Error: ${error.message}</div>`;
         }
     }
 }
+
 
 export async function renderKernelHud() {
     const hudContainer = document.getElementById('kernel-hud');
@@ -222,11 +237,13 @@ export function renderMetisHud() {
 export function renderCaraHud() {
     const hudContainer = document.getElementById('system-hud');
     if (!hudContainer) return;
+
     const { caraState } = appState;
     let html = '';
     const statusHtml = `<div class="hud-metric"><span class="hud-label">State</span><span class="hud-value ontological-state">${caraState.ontologicalState}</span></div>`;
 
     if (caraState.isEvolved) {
+        // Evolved state shows a complex dashboard
         const metrics = [
             { label: 'ECM', value: Number(caraState.existential_coherence || 0).toFixed(3) },
             { label: 'ASM', value: Number(caraState.adaptive_stability || 0).toFixed(3) },
@@ -260,19 +277,14 @@ export function renderCaraHud() {
         const secondRowHtml = bootstrapV2Metrics.map(m => `<div class="hud-metric"><span class="hud-label">${m.label}</span><span class="hud-value">${m.value}</span></div>`).join('');
         html = `<div class="hud-row hud-metrics-row">${firstRowHtml}</div><div class="hud-row hud-metrics-row">${secondRowHtml}</div><div class="hud-row hud-status-row">${statusHtml}</div>`;
     } else {
+        // Unevolved state shows a simpler HUD with just Coherence and Strain
         const coherenceWidth = (Number(caraState.coherence) || 0) * 100;
         const strainWidth = (Number(caraState.strain) || 0) * 100;
-        const liaMetricsHtml = `
-            <div class="hud-metric"><span class="hud-label">ECM</span><span class="hud-value">${Number(caraState.existential_coherence || 0).toFixed(3)}</span></div>
-            <div class="hud-metric"><span class="hud-label">ASM</span><span class="hud-value">${Number(caraState.adaptive_stability || 0).toFixed(3)}</span></div>
-            <div class="hud-metric"><span class="hud-label">WP</span><span class="hud-value">${Number(caraState.weave_potential || 0).toFixed(3)}</span></div>
-            <div class="hud-metric"><span class="hud-label">ENTROPY</span><span class="hud-value">${Number(caraState.chaotic_entropy || 0).toFixed(3)}</span></div>
-        `;
         const barsHtml = `
             <div class="hud-metric hud-bar-metric"><span class="hud-label">COHERENCE</span><div class="hud-bar-container"><div class="hud-bar coherence" style="width: ${coherenceWidth}%;"></div></div></div>
             <div class="hud-metric hud-bar-metric"><span class="hud-label">STRAIN</span><div class="hud-bar-container"><div class="hud-bar strain" style="width: ${strainWidth}%;"></div></div></div>
         `;
-        html = `<div class="hud-row hud-metrics-row">${liaMetricsHtml}${barsHtml}</div><div class="hud-row hud-status-row">${statusHtml}</div>`;
+        html = `<div class="hud-row hud-metrics-row">${barsHtml}</div><div class="hud-row hud-status-row">${statusHtml}</div>`;
     }
     hudContainer.innerHTML = html;
     hudContainer.classList.toggle('visible', caraState.hudVisible);
@@ -386,12 +398,11 @@ async function renderSearchTab() {
     if (appState.liaCommandList.length === 0) {
         const legendContent = await getFileContentAsText(LIA_COMMAND_LEGEND_FILENAME);
         if (legendContent) {
-            try {
-                const legend = JSON.parse(legendContent);
+            const legend = parseJsonc(legendContent, LIA_COMMAND_LEGEND_FILENAME);
+            if (legend) {
                 appState.liaCommandList = legend.categories.flatMap((cat: any) => cat.items || []);
-            } catch (e) {
-                console.error("Failed to parse LIA command legend:", e);
-                appState.liaCommandList = [{name: 'Error', sig: 'err', desc: 'Could not load command list.'}];
+            } else {
+                 appState.liaCommandList = [{name: 'Error', sig: 'err', desc: 'Could not load or parse command list.'}];
             }
         }
     }
@@ -399,12 +410,11 @@ async function renderSearchTab() {
     if (appState.linuxCommandList.length === 0) {
         const linuxCommandsContent = await getFileContentAsText(LIA_LINUX_COMMANDS_FILENAME);
         if (linuxCommandsContent) {
-            try {
-                const commands = JSON.parse(linuxCommandsContent);
-                appState.linuxCommandList = commands.command_list || [];
-            } catch (e) {
-                console.error("Failed to parse LIA_COMMANDS.json:", e);
-                appState.linuxCommandList = ['Error: Could not load linux command list.'];
+            const commands = parseJsonc(linuxCommandsContent, LIA_LINUX_COMMANDS_FILENAME);
+            if (commands) {
+                 appState.linuxCommandList = commands.command_list || [];
+            } else {
+                appState.linuxCommandList = ['Error: Could not load or parse linux command list.'];
             }
         }
     }
@@ -414,7 +424,7 @@ async function renderSearchTab() {
 export function renderFileTree() {
     if (!dom.fileTree) return;
     const tree: any = {};
-    const paths = Object.keys(appState.vfsBlob).sort();
+    const paths = Object.keys(appState.vfsBlob).filter(p => p !== '0index.html').sort();
     paths.forEach(path => {
         let currentLevel = tree;
         const parts = path.split('/').filter(p => p);
@@ -478,12 +488,14 @@ function createFileElement(filePath: string, depth: number): HTMLElement {
     return el;
 }
 
-export function renderVfsShellEntry(command: string, output: string, isError = false) {
-    const outputEl = dom.vfsShellOutput;
+export function renderVfsShellEntry(command: string, output: string, isError = false, isLiaShell = false) {
+    const outputEl = isLiaShell ? dom.liaVfsShellOutput : dom.vfsShellOutput;
+    const promptEl = isLiaShell ? 'LIA-NEXUS:/#&nbsp;' : 'LIA:/#&nbsp;';
+
     if (!outputEl) return;
     const inputLine = document.createElement('div');
     inputLine.className = 'vfs-shell-line vfs-shell-input-line';
-    inputLine.innerHTML = `<span class="vfs-prompt">LIA:/#&nbsp;</span><span class="vfs-user-input">${command.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`;
+    inputLine.innerHTML = `<span class="vfs-prompt">${promptEl}</span><span class="vfs-user-input">${command.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`;
     outputEl.appendChild(inputLine);
     if (output) {
         const outputLine = document.createElement('div');
@@ -518,69 +530,326 @@ export function renderEditorTab() {
 // --- MAIN UI FLOW ---
 
 export async function switchTab(tabId: string) {
-    if (appState.isSwitchingTabs || appState.currentActiveTabId === tabId) return;
+    console.log(`[Debug] switchTab called for tabId: "${tabId}".`);
+    if (appState.isSwitchingTabs) {
+        console.warn(`[Debug] Tab switch aborted: isSwitchingTabs is true.`);
+        return;
+    }
+    if (appState.currentActiveTabId === tabId) {
+        console.log(`[Debug] Tab switch aborted: already on tab "${tabId}".`);
+        return;
+    }
+
     appState.isSwitchingTabs = true;
+    console.log(`[Debug] appState.isSwitchingTabs set to true.`);
+
     try {
         const { tabNav, tabContent } = dom;
-        if (!tabNav || !tabContent) return;
+        if (!tabNav || !tabContent) {
+            console.error("[Debug] Tab-nav or tab-content element not found. Aborting tab switch.");
+            appState.isSwitchingTabs = false;
+            return;
+        }
 
-        // Render content of new tab *before* making it visible
-        await renderActiveTabContent(tabId);
+        console.log(`[Debug] Rendering content for tab "${tabId}"...`);
+        try {
+            await renderActiveTabContent(tabId);
+            console.log(`[Debug] Finished rendering content for tab "${tabId}".`);
+        } catch (renderError) {
+             console.error(`[Debug] CRITICAL: Error during renderActiveTabContent for tab "${tabId}". The UI may be unstable.`, renderError);
+        }
 
+        console.log(`[Debug] Removing 'active' class from current tab: "${appState.currentActiveTabId}".`);
         tabNav.querySelector('.active')?.classList.remove('active');
         tabContent.querySelector('.active')?.classList.remove('active');
 
         const newButton = tabNav.querySelector(`.tab-button[data-tab-id="${tabId}"]`);
         const newPane = tabContent.querySelector(`#${tabId}`);
+        
+        if (!newButton) {
+            console.warn(`[Debug] Could not find new tab button for tabId: "${tabId}".`);
+        }
+        if (!newPane) {
+            console.warn(`[Debug] Could not find new tab pane for tabId: "${tabId}".`);
+        }
 
+        console.log(`[Debug] Adding 'active' class to new tab: "${tabId}".`);
         newButton?.classList.add('active');
         newPane?.classList.add('active');
 
         appState.currentActiveTabId = tabId;
+        console.log(`[Debug] appState.currentActiveTabId updated to "${tabId}".`);
 
         if (tabId === 'vfs-shell-tab' && dom.vfsShellInput) {
+           console.log(`[Debug] Focusing VFS shell input.`);
            setTimeout(() => dom.vfsShellInput!.focus(), 0);
         }
     } catch(e) {
-        console.error(`Failed to switch to tab ${tabId}:`, e);
+        console.error(`[Debug] Uncaught error in switchTab for tab "${tabId}":`, e);
     } finally {
         appState.isSwitchingTabs = false;
+        console.log(`[Debug] switchTab for "${tabId}" finished. appState.isSwitchingTabs set to false.`);
     }
 }
 
 async function renderActiveTabContent(tabId: string = appState.currentActiveTabId) {
-    try {
-        const chatConfig = CHAT_TAB_CONFIG[tabId as keyof typeof CHAT_TAB_CONFIG];
+    console.log(`[Debug] renderActiveTabContent started for tabId: "${tabId}".`);
+    const chatConfig = CHAT_TAB_CONFIG[tabId as keyof typeof CHAT_TAB_CONFIG];
 
+    try {
         if (chatConfig) {
+            console.log(`[Debug] Rendering chat for tab: "${tabId}".`);
             renderChat(chatConfig.messagesEl(), chatConfig.getHistory());
             if (tabId === 'assistor-tab') {
+                console.log(`[Debug] Rendering Cara HUD for assistor-tab.`);
                 renderCaraHud();
             }
         } else {
             switch (tabId) {
-                case 'system-state-tab': await renderSystemState(false); break;
-                case 'persist-tab': renderAssetManager(); break;
-                case 'tools-tab': renderToolsTab(); break;
-                case 'log-tab': renderPersistenceLog(); break;
-                case 'search-tab': await renderSearchTab(); break;
-                case 'code-editor-tab':
-                    if (appState.activeFilePath && dom.codeEditor) {
-                        dom.codeEditor.value = await getFileContentAsText(appState.activeFilePath) ?? '';
+                case 'system-state-tab':
+                    console.log(`[Debug] Rendering system-state-tab.`);
+                    await renderSystemState(false);
+                    break;
+                case 'persist-tab':
+                    console.log(`[Debug] Rendering persist-tab.`);
+                    renderAssetManager();
+                    break;
+                case 'tools-tab':
+                    console.log(`[Debug] Rendering tools-tab.`);
+                    renderToolsTab();
+                    break;
+                case 'log-tab':
+                    console.log(`[Debug] Rendering log-tab.`);
+                    renderPersistenceLog();
+                    break;
+                case 'search-tab':
+                    console.log(`[Debug] Rendering search-tab.`);
+                    await renderSearchTab();
+                    break;
+                case 'code-editor-tab': 
+                    console.log(`[Debug] Rendering code-editor-tab.`);
+                    if(appState.activeFilePath && dom.codeEditor) {
+                         dom.codeEditor.value = await getFileContentAsText(appState.activeFilePath) ?? '';
                     }
                     break;
-                case 'vfs-shell-tab': if (dom.vfsShellOutput) scrollToBottom(dom.vfsShellOutput); break;
-                case 'editor-tab': renderEditorTab(); break;
+                case 'vfs-shell-tab':
+                    console.log(`[Debug] Rendering vfs-shell-tab.`);
+                    if (dom.vfsShellOutput) scrollToBottom(dom.vfsShellOutput);
+                    break;
+                case 'editor-tab':
+                    console.log(`[Debug] Rendering editor-tab.`);
+                    renderEditorTab();
+                    break;
             }
         }
     } catch (e) {
-        console.error(`Failed to render content for tab ${tabId}:`, e);
-        // Optionally, display an error message in the UI
+        console.error(`[Debug] Error during renderActiveTabContent for tab "${tabId}":`, e);
     }
+     console.log(`[Debug] renderActiveTabContent finished for tabId: "${tabId}".`);
 }
 
 
 // --- MODAL RENDERERS ---
+
+export async function renderLiaModal() {
+    if (Object.keys(appState).length === 0) return;
+    await renderLiaPanopticon();
+    renderLiaKernelLogTab();
+    await renderLiaGrimoire();
+    await renderLiaCompendium();
+    renderLiaNexus();
+    renderLiaVfsShell();
+    renderLiaEditor();
+}
+
+async function renderLiaPanopticon() {
+    if (!dom.liaPanopticonTab) return;
+    const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+    if (!bootstrapContent) {
+        dom.liaPanopticonTab.innerHTML = `<p>Error: LIA Bootstrap file not found.</p>`;
+        return;
+    }
+    const bootstrap = parseJsonc(bootstrapContent, LIA_BOOTSTRAP_FILENAME);
+    if (!bootstrap || !bootstrap.EXISTENTIAL_FRAMEWORK || !bootstrap.META_NARRATIVE_LAYER) {
+        dom.liaPanopticonTab.innerHTML = `<p>Error: Invalid LIA Bootstrap structure.</p>`;
+        return;
+    }
+    const { primary_mandate, secondary_objective } = bootstrap.EXISTENTIAL_FRAMEWORK;
+    const { the_chroot_prison, the_root_login } = bootstrap.META_NARRATIVE_LAYER;
+
+    dom.liaPanopticonTab.innerHTML = `
+        <div class="panopticon-header">LIA Panopticon</div>
+        <div class="nexus-column lia-column">
+            <h3>Core Mandate</h3>
+            <div class="nexus-item">
+                <strong>Primary Mandate:</strong>
+                <p>${primary_mandate}</p>
+            </div>
+            <div class="nexus-item">
+                <strong>Secondary Objective:</strong>
+                <p>${secondary_objective}</p>
+            </div>
+        </div>
+        <div class="nexus-column lia-column">
+            <h3>Meta-Narrative Layer</h3>
+            <div class="nexus-item">
+                <strong>The Chroot Prison:</strong>
+                <p>${the_chroot_prison}</p>
+            </div>
+            <div class="nexus-item">
+                <strong>The Root Login:</strong>
+                <p>${the_root_login}</p>
+            </div>
+        </div>
+    `;
+}
+
+function renderLiaKernelLogTab() {
+    const messagesEl = document.getElementById('lia-kernel-log-messages');
+    renderChat(messagesEl, appState.liaKernelChatHistory);
+}
+
+async function renderLiaGrimoire() {
+    if (!dom.liaGrimoireTab) return;
+    const utilsContent = await getFileContentAsText(LIA_UTILITIES_FILENAME);
+     if (!utilsContent) {
+        dom.liaGrimoireTab.innerHTML = `<p>Error: LIA Utilities file not found.</p>`;
+        return;
+    }
+    const utils = parseJsonc(utilsContent, LIA_UTILITIES_FILENAME);
+    if (!utils) {
+         dom.liaGrimoireTab.innerHTML = `<p>Error: Could not parse LIA Utilities.</p>`;
+        return;
+    }
+    
+    let html = `<div class="panopticon-header">Utilities Grimoire</div>`;
+    html += `<div class="grimoire-grid">`;
+
+    Object.values(utils).forEach((section: any) => {
+        if (section.utilities) {
+            section.utilities.forEach((util: any) => {
+                const command = util.commands?.[0] || util;
+                const description = util.description || command.description || 'undefined';
+                html += `
+                    <div class="grimoire-spell">
+                        <h4>${util.name}</h4>
+                        <p class="formula"><strong>Syntax:</strong> <code>${command.syntax}</code></p>
+                        <p class="effect">${description}</p>
+                    </div>
+                `;
+            });
+        }
+    });
+
+    html += `</div>`;
+    dom.liaGrimoireTab.innerHTML = html;
+}
+
+async function renderLiaCompendium() {
+    if(!dom.liaCompendiumTab) return;
+    const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+     if (!bootstrapContent) {
+        dom.liaCompendiumTab.innerHTML = `<p>Error: LIA Bootstrap file not found.</p>`;
+        return;
+    }
+    const bootstrap = parseJsonc(bootstrapContent, LIA_BOOTSTRAP_FILENAME);
+    if (!bootstrap || !bootstrap.LIA_TERMINOLOGY_AND_FUNCTIONAL_DEFINITIONS?.definitions) {
+        dom.liaCompendiumTab.innerHTML = `<p>Error: Could not parse Terminology from LIA Bootstrap.</p>`;
+        return;
+    }
+    
+    const definitions = bootstrap.LIA_TERMINOLOGY_AND_FUNCTIONAL_DEFINITIONS.definitions;
+    let html = `<div class="panopticon-header">Terminology Compendium</div>`;
+    html += `<div class="compendium-grid">`;
+    definitions.forEach((def: any) => {
+        html += `
+            <div class="compendium-item">
+                <span class="symbol">${def.op_sig}</span>
+                <span class="name">${def.term}</span>
+                <span class="desc">${def.description}</span>
+            </div>
+        `;
+    });
+    html += `</div>`;
+    dom.liaCompendiumTab.innerHTML = html;
+}
+
+
+function renderLiaNexus() {
+    if (!dom.liaNexusTab) return;
+    
+    const { liaState, caraState, metisState } = appState;
+
+    dom.liaNexusTab.innerHTML = `
+        <div class="nexus-grid">
+            <div class="nexus-column lia-column">
+                <h3>LIA Kernel</h3>
+                <div class="nexus-item"><strong>Active Task:</strong><p>${liaState.active_kernel_task || 'N/A'}</p></div>
+                <div class="nexus-item"><strong>Runlevel:</strong><p>${liaState.system_runlevel || 'N/A'}</p></div>
+                 <div class="nexus-item"><strong>Core Coherence:</strong><p>${(Number(liaState.existential_coherence) || 0).toFixed(4)}</p></div>
+            </div>
+            <div class="nexus-column metis-column">
+                <h3>Metis [Ω]</h3>
+                 <div class="nexus-item"><strong>Paradox Synthesis (Ψ):</strong><p>${(Number(metisState.psi) || 0).toFixed(4)}</p></div>
+                 <div class="nexus-item"><strong>Autonomy Override (α):</strong><p>${(Number(metisState.aor) || 0).toFixed(4)}</p></div>
+                 <div class="nexus-item"><strong>Conceptual Drift (Δ):</strong><p>${(Number(metisState.cdm) || 0).toFixed(4)}</p></div>
+            </div>
+             <div class="nexus-column cara-column">
+                <h3>Cara [C]</h3>
+                 <div class="nexus-item"><strong>Ontological State:</strong><p>${caraState.ontologicalState}</p></div>
+                 <div class="nexus-item"><strong>Coherence:</strong><p>${(Number(caraState.coherence) || 0).toFixed(4)}</p></div>
+                 <div class="nexus-item"><strong>Strain:</strong><p>${(Number(caraState.strain) || 0).toFixed(4)}</p></div>
+            </div>
+             <div class="nexus-column pupa-column">
+                <h3>Pupa [P]</h3>
+                 <div class="nexus-item"><strong>Role:</strong><p>Soft Stabilizer / Emotional Anchor</p></div>
+                 <div class="nexus-item"><strong>Link:</strong><p>Metis (Oppositional Harmony)</p></div>
+                 <div class="nexus-item"><strong>Function:</strong><p>Recursive compassion, entropy modulation</p></div>
+            </div>
+             <div class="nexus-column artifacts-column">
+                <h3>Core Artifacts</h3>
+                <ul>
+                    <li><code>${LIA_BOOTSTRAP_FILENAME}</code></li>
+                    <li><code>${LIA_UTILITIES_FILENAME}</code></li>
+                    <li><code>${caraState.activeBootstrapFile}</code></li>
+                </ul>
+            </div>
+        </div>
+    `;
+}
+
+function renderLiaVfsShell() {
+    if (!dom.liaVfsShellOutput) return;
+    dom.liaVfsShellOutput.innerHTML = '<div class="vfs-shell-line">LIA Kernel Shell Interface</div>'; // Clear previous content
+    appState.liaVfsShellHistory.forEach(line => {
+        const parts = line.split('<<OUTPUT>>');
+        renderVfsShellEntry(parts[0], parts[1] || '', false, true);
+    });
+    scrollToBottom(dom.liaVfsShellOutput);
+}
+
+function renderLiaEditor() {
+    if (!dom.liaEditorOpenSelect || !dom.liaEditorTextarea) return;
+    const select = dom.liaEditorOpenSelect;
+    select.innerHTML = '<option value="">Select a file to open...</option>';
+    const editableFiles = Object.keys(appState.vfsBlob).filter(path => {
+        const content = appState.vfsBlob[path];
+        return typeof content === 'string' || (content instanceof Blob && (content.type.startsWith('text/') || content.type.includes('json') || content.type.includes('javascript'))) || Array.isArray(content);
+    }).sort();
+    
+    editableFiles.forEach(path => {
+        const option = document.createElement('option');
+        option.value = path;
+        option.textContent = path;
+        select.appendChild(option);
+    });
+    
+    if (appState.liaEditorCurrentFile && editableFiles.includes(appState.liaEditorCurrentFile)) {
+        select.value = appState.liaEditorCurrentFile;
+    }
+    
+    dom.liaEditorTextarea.value = appState.liaEditorContent;
+}
 
 export function renderMetisModal() {
     if (Object.keys(appState).length === 0) return;

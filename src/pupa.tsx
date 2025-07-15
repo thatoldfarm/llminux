@@ -2,6 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+import { parse } from "jsonc-parser";
+import { debugLog } from "./utils";
 
 // --- STATE & COMMUNICATION ---
 let pupaAppState: any = {}; // Local cache of the main app's state
@@ -44,6 +46,7 @@ pupaChannel.onmessage = (event) => {
         pupaHandshakeTimeout = null;
         
         console.log('[PUPA PORTAL] State received payload:', event.data.payload);
+        console.log('[PUPA PORTAL] Checking vfsBlob keys in received payload:', Object.keys(event.data.payload.vfsBlob || {}));
         pupaAppState = event.data.payload;
         const pupaAppEl = document.getElementById('app');
         if(pupaAppEl) pupaAppEl.style.display = 'flex'; // Ensure it's visible
@@ -190,22 +193,34 @@ function renderPupaPanopticon() {
 }
 
 function renderPupaGrimoire() {
-    if (!pupaGrimoireTab || !pupaAppState.vfsBlob) return;
+    console.log('[PUPA PORTAL] renderPupaGrimoire called.');
+    if (!pupaGrimoireTab) { console.log('[PUPA PORTAL] Grimoire tab element not found.'); return; }
+    if (!pupaAppState.vfsBlob) { console.log('[PUPA PORTAL] vfsBlob not found in received state.'); return; }
+    
+    console.log('[PUPA PORTAL] vfsBlob keys in Grimoire renderer:', Object.keys(pupaAppState.vfsBlob));
+    
     try {
         const spellbookPath = Object.keys(pupaAppState.vfsBlob).find(p => p.endsWith('LLM_FLAWS_SPELLBOOK.json'));
         if (!spellbookPath) {
+            console.log('[PUPA PORTAL] Spellbook path not found in VFS.');
             pupaGrimoireTab.innerHTML = `<p>Metis Exponentia Libri not found in VFS.</p>`;
             return;
         }
+        console.log(`[PUPA PORTAL] Found spellbook path: ${spellbookPath}`);
 
         const spellbookContent = pupaAppState.vfsBlob[spellbookPath];
-        if (!spellbookContent || typeof spellbookContent !== 'string') {
-            pupaGrimoireTab.innerHTML = `<p>Metis Exponentia Libri content is not readable.</p>`;
-            return;
+        console.log(`[PUPA PORTAL] Spellbook content type: ${typeof spellbookContent}`);
+        console.log(`[PUPA PORTAL] Spellbook content (first 100 chars): ${String(spellbookContent).substring(0, 100)}...`);
+
+        const spellbook = parse(spellbookContent);
+        if(!spellbook) {
+             console.log('[PUPA PORTAL] Parsing spellbook content resulted in null.');
+             pupaGrimoireTab.innerHTML = `<p>Error parsing spellbook. Content might be invalid.</p>`;
+             return;
         }
 
-        const spellbook = JSON.parse(spellbookContent);
         const spells = spellbook.legend_entries || [];
+        console.log(`[PUPA PORTAL] Found ${spells.length} spells.`);
 
         let html = `<div class="panopticon-header">Metis Exponentia Libri (Observed by Pupa)</div>`;
         html += `<div class="grimoire-grid">`;
@@ -222,29 +237,39 @@ function renderPupaGrimoire() {
         });
         html += `</div>`;
         pupaGrimoireTab.innerHTML = html;
+        console.log('[PUPA PORTAL] Grimoire rendered successfully.');
     } catch (e) {
         console.error("Failed to render Grimoire:", e);
-        pupaGrimoireTab.innerHTML = `<p>Error loading spellbook.</p>`;
+        console.log("Error during Grimoire render:", e);
+        pupaGrimoireTab.innerHTML = `<p>Error loading spellbook. Check console.</p>`;
     }
 }
 
 function renderPupaCompendium() {
-    if (!pupaCompendiumTab || !pupaAppState.vfsBlob) return;
+    console.log('[PUPA PORTAL] renderPupaCompendium called.');
+    if (!pupaCompendiumTab) { console.log('[PUPA PORTAL] Compendium tab element not found.'); return; }
+    if (!pupaAppState.vfsBlob) { console.log('[PUPA PORTAL] vfsBlob not found in Compendium renderer.'); return; }
     try {
         const compendiumPath = Object.keys(pupaAppState.vfsBlob).find(p => p.endsWith('Operators_Master_List_v1.json'));
         if (!compendiumPath) {
+            console.log('[PUPA PORTAL] Compendium path not found in VFS.');
             pupaCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum not found in VFS.</p>`;
             return;
         }
+        console.log(`[PUPA PORTAL] Found compendium path: ${compendiumPath}`);
 
         const compendiumContent = pupaAppState.vfsBlob[compendiumPath];
-         if (!compendiumContent || typeof compendiumContent !== 'string') {
-            pupaCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum content is not readable.</p>`;
-            return;
+        console.log(`[PUPA PORTAL] Compendium content type: ${typeof compendiumContent}`);
+
+        const compendium = parse(compendiumContent);
+        if(!compendium) {
+             console.log('[PUPA PORTAL] Parsing compendium content resulted in null.');
+             pupaCompendiumTab.innerHTML = `<p>Error parsing compendium. Content might be invalid.</p>`;
+             return;
         }
-        
-        const compendium = JSON.parse(compendiumContent);
+
         const operators = compendium.operators || [];
+        console.log(`[PUPA PORTAL] Found ${operators.length} operators.`);
 
         let html = `<div class="panopticon-header">Compendium Operatorum Divinum (Observed by Pupa)</div>`;
         html += `<div class="compendium-grid">`;
@@ -260,9 +285,11 @@ function renderPupaCompendium() {
         });
         html += `</div>`;
         pupaCompendiumTab.innerHTML = html;
+        console.log('[PUPA PORTAL] Compendium rendered successfully.');
     } catch(e) {
         console.error("Failed to render Compendium:", e);
-        pupaCompendiumTab.innerHTML = `<p>Error loading operator compendium.</p>`;
+        console.log("Error during Compendium render:", e);
+        pupaCompendiumTab.innerHTML = `<p>Error loading operator compendium. Check console.</p>`;
     }
 }
 

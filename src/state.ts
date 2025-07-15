@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -119,6 +117,12 @@ export const appState: AppState = {
     vfsShellHistoryIndex: -1,
     vfsViIsActive: false,
     vfsViCurrentFile: null,
+    debugMode: true,
+    // LIA Modal State
+    liaVfsShellHistory: [],
+    liaVfsShellHistoryIndex: -1,
+    liaEditorContent: '',
+    liaEditorCurrentFile: null,
 };
 
 

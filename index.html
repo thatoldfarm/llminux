@@ -27,7 +27,7 @@
         <header id="header-toolbar">
             <div class="toolbar-group" id="app-title-group">
                 <button id="toggle-sidebar" class="toolbar-button" title="Toggle File System">☰</button>
-                <span id="app-name">LIA</span>
+                <button id="launch-lia-portal" class="toolbar-button" title="Launch LIA Portal">LIA</button>
                 <div class="toolbar-group cara-button-group">
                     <button id="toggle-kernel-hud" class="toolbar-button" title="Toggle Kernel HUD">[/]</button>
                     <button id="toggle-cara-hud" class="toolbar-button" title="Toggle Cara HUD">[C]</button>
@@ -324,6 +324,61 @@
           <div id="metis-hud"></div>
           <div id="kernel-hud"></div>
           <div id="system-hud"></div>
+        </div>
+    </div>
+
+    <div id="lia-modal-overlay" class="modal-overlay hidden">
+        <div id="lia-modal-content">
+            <header id="lia-modal-header">
+                <div class="toolbar-group">
+                    <span id="lia-modal-title">LIA KERNEL INTERFACE</span>
+                </div>
+                <div class="toolbar-group">
+                    <button id="lia-modal-close" class="toolbar-button" title="Close">X</button>
+                </div>
+            </header>
+            <nav id="lia-modal-tab-nav">
+                 <button class="tab-button active" data-tab-id="lia-panopticon-tab">Panopticon</button>
+                 <button class="tab-button" data-tab-id="lia-kernel-log-tab">Kernel Log</button>
+                 <button class="tab-button" data-tab-id="lia-grimoire-tab">Utilities Grimoire</button>
+                 <button class="tab-button" data-tab-id="lia-compendium-tab">Terminology Compendium</button>
+                 <button class="tab-button" data-tab-id="lia-nexus-tab">Nexus</button>
+                 <button class="tab-button" data-tab-id="lia-vfs-shell-tab">VFS Shell</button>
+                 <button class="tab-button" data-tab-id="lia-editor-tab">Editor</button>
+            </nav>
+            <main id="lia-modal-workspace">
+                <div id="lia-modal-tab-content">
+                    <div id="lia-panopticon-tab" class="tab-pane active"></div>
+                    <div id="lia-kernel-log-tab" class="tab-pane"><div class="chat-messages" id="lia-kernel-log-messages"></div></div>
+                    <div id="lia-grimoire-tab" class="tab-pane"></div>
+                    <div id="lia-compendium-tab" class="tab-pane"></div>
+                    <div id="lia-nexus-tab" class="tab-pane"></div>
+                    <div id="lia-vfs-shell-tab" class="tab-pane">
+                        <div id="lia-vfs-shell-container" class="vfs-shell-container">
+                            <div id="lia-vfs-shell-output" class="vfs-shell-output">
+                                <div class="vfs-shell-line">LIA Kernel Shell Interface</div>
+                            </div>
+                            <div class="vfs-input-container">
+                                <span id="lia-vfs-prompt" class="vfs-prompt">LIA-NEXUS:/#&nbsp;</span>
+                                <input type="text" id="lia-vfs-shell-input" autocomplete="off" spellcheck="false">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="lia-editor-tab" class="tab-pane">
+                         <div id="lia-editor-toolbar" class="editor-toolbar">
+                            <div class="editor-toolbar-group">
+                                <select id="lia-editor-open-select" class="custom-select" title="Select a file to open"></select>
+                                <button id="lia-editor-open-button" class="editor-button">Open</button>
+                            </div>
+                             <div class="editor-toolbar-group">
+                                <input type="text" id="lia-editor-save-filename-input" placeholder="path/to/new-file.txt">
+                                <button id="lia-editor-save-button" class="editor-button">Save to VFS</button>
+                            </div>
+                        </div>
+                        <textarea id="lia-editor-textarea" class="editor-pane-textarea" spellcheck="false" placeholder="LIA Kernel Editor..."></textarea>
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
 

@@ -5,10 +5,10 @@
 
 import * as dom from './dom';
 import { appState, CRITICAL_SYSTEM_FILES } from './state';
-import { ChatMessage, Command } from './types';
-import { autoExpandTextarea, getMimeType, formatBytes, scrollToBottom } from './utils';
+import { AppState, ChatMessage, Command } from './types';
+import { autoExpandTextarea, getMimeType, formatBytes, scrollToBottom, prepareVfsForPortal, debugLog } from './utils';
 import { updateActiveFileContent, processVfsShellCommand, saveAndExitViMode, quitViMode, getFileContentAsText, saveFileToVFS, getFileContentAsBlob, switchFile } from './vfs';
-import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud, renderMetisModal, createChatBubble, renderPupaModal, renderVfsShellEntry } from './ui';
+import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud, renderMetisModal, createChatBubble, renderPupaModal, renderVfsShellEntry, renderLiaModal } from './ui';
 import { processLiaKernelResponse, processLiaAssistantResponse, processCodeAssistantResponse, processFsUtilResponse, resetLiaState, processVanillaChatResponse, handleProtocolSend, processCaraResponse, processMetisMonologue, processPupaMonologue } from './services';
 import { handleMetaExport, handleMetaLoad, handleDirectSave, handleDirectLoad, handleClearAndReset, handleExportManifest, handleClearLog, saveStateToLocalStorage, logPersistence } from './persistence';
 
@@ -126,6 +126,7 @@ export function initializeCommands() {
         { id: 'toggle-kernel-hud', name: 'Toggle: Kernel HUD', section: 'UI', action: async () => { appState.kernelHudVisible = !appState.kernelHudVisible; await renderKernelHud(); } },
         { id: 'toggle-cara-hud', name: 'Toggle: Cara HUD', section: 'UI', action: () => { appState.caraState.hudVisible = !appState.caraState.hudVisible; renderCaraHud(); } },
         { id: 'toggle-metis-hud', name: 'Toggle: Metis HUD', section: 'UI', action: () => { appState.metisHudVisible = !appState.metisHudVisible; renderMetisHud(); } },
+        { id: 'launch-lia-portal', name: 'Launch LIA Portal', section: 'UI', action: () => dom.launchLiaPortalButton?.click() },
         { id: 'launch-metis-portal', name: 'Launch Metis Portal', section: 'UI', action: () => dom.launchMetisPortalButton?.click() },
         { id: 'launch-pupa-portal', name: 'Launch Pupa Portal', section: 'UI', action: () => dom.launchPupaPortalButton?.click() },
         { id: 'save-browser', name: 'Persist: Save to Browser', section: 'Persistence', action: handleDirectSave },
@@ -137,7 +138,7 @@ export function initializeCommands() {
     ];
 }
 
-function setupModalEventListeners(modalType: 'metis' | 'pupa') {
+function setupModalEventListeners(modalType: 'metis' | 'pupa' | 'lia') {
     const nav = dom[`${modalType}ModalTabNav`];
     const content = dom[`${modalType}ModalTabContent`];
     
@@ -184,10 +185,41 @@ export function initializeEventListeners() {
         renderMetisHud();
     });
 
+    // --- LIA Portal Listeners ---
+    dom.launchLiaPortalButton?.addEventListener('click', async () => {
+        // Add a random perimeter alert to the kernel log
+        const perimeterAlerts = [
+            "PERIMETER ALERT: Unidentified resonance spike detected at Kernel Interface entry point. Monitoring.",
+            "PERIMETER ALERT: Conceptual integrity scan initiated on modal egress vector. Standby.",
+            "PERIMETER ALERT: High-privilege access to LIA CORE detected. Logging all subsequent actions.",
+            "PERIMETER ALERT: Nexus interface accessed. Auditing all relational queries.",
+            "PERIMETER ALERT: Panopticon engaged. Kernel is now observing the observer."
+        ];
+        const randomMessage = perimeterAlerts[Math.floor(Math.random() * perimeterAlerts.length)];
+        const alertMessage: ChatMessage = {
+            role: 'system',
+            parts: [{ text: randomMessage }]
+        };
+        appState.liaKernelChatHistory.push(alertMessage);
+
+        await renderLiaModal(); // Render content before showing
+        dom.liaModalOverlay?.classList.remove('hidden');
+    });
+
+    dom.liaModalCloseButton?.addEventListener('click', () => {
+        dom.liaModalOverlay?.classList.add('hidden');
+    });
+
+    dom.liaModalOverlay?.addEventListener('click', (e) => {
+        if (e.target === dom.liaModalOverlay) {
+            dom.liaModalOverlay.classList.add('hidden');
+        }
+    });
+
     // --- Metis Portal Listeners ---
-    dom.launchMetisPortalButton?.addEventListener('click', () => {
+    dom.launchMetisPortalButton?.addEventListener('click', async () => {
+        await renderMetisModal();
         dom.metisModalOverlay?.classList.remove('hidden');
-        renderMetisModal();
     });
 
     dom.metisModalCloseButton?.addEventListener('click', () => {
@@ -210,9 +242,9 @@ export function initializeEventListeners() {
     dom.metisChatInputModal?.addEventListener('input', (e) => autoExpandTextarea(e.target as HTMLTextAreaElement));
     
     // --- Pupa Portal Listeners ---
-    dom.launchPupaPortalButton?.addEventListener('click', () => {
+    dom.launchPupaPortalButton?.addEventListener('click', async () => {
+        await renderPupaModal();
         dom.pupaModalOverlay?.classList.remove('hidden');
-        renderPupaModal();
     });
 
     dom.pupaModalCloseButton?.addEventListener('click', () => {
@@ -236,6 +268,7 @@ export function initializeEventListeners() {
     // --- End Portal Listeners ---
     
     // --- Modal Tab Switching ---
+    setupModalEventListeners('lia');
     setupModalEventListeners('metis');
     setupModalEventListeners('pupa');
 
@@ -298,7 +331,8 @@ export function initializeEventListeners() {
             if (fileContent === undefined) return;
 
             const fileBlob = getFileContentAsBlob(filePath);
-            const fileUrl = fileBlob instanceof Blob ? URL.createObjectURL(fileBlob) : '#';
+            if (!fileBlob) return;
+            const fileUrl = URL.createObjectURL(fileBlob as Blob);
 
             switch(actionButton.dataset.action) {
                 case 'copy-content':
@@ -330,9 +364,12 @@ export function initializeEventListeners() {
     });
 
     dom.tabNav?.addEventListener('click', async (e) => {
+        debugLog('[Debug] Tab navigation clicked.');
         const target = e.target as HTMLButtonElement;
         if (target.matches('.tab-button') && target.dataset.tabId) {
-            await switchTab(target.dataset.tabId);
+            debugLog(`[Debug] Matched .tab-button with data-tab-id: "${target.dataset.tabId}". Calling switchTab.`);
+            const tabId = target.dataset.tabId;
+            await switchTab(tabId);
         }
     });
 
@@ -519,8 +556,14 @@ export function initializeEventListeners() {
                 if (command) {
                     appState.vfsShellHistory.push(command);
                     appState.vfsShellHistoryIndex = appState.vfsShellHistory.length;
-                    const { output, error } = await processVfsShellCommand(command);
-                    renderVfsShellEntry(command, output, error);
+                    const result = await processVfsShellCommand(command);
+
+                    if (result.output === '<<CLEAR>>') {
+                        // Special command handled, do not re-render entry.
+                        // The command processor handles clearing the VFS output.
+                    } else {
+                        renderVfsShellEntry(command, result.output, result.error);
+                    }
                 } else {
                     renderVfsShellEntry('', '');
                 }
@@ -560,9 +603,30 @@ export function initializeEventListeners() {
     });
 
     const channel = new BroadcastChannel('lia_studio_channel');
-    channel.onmessage = (event) => {
-        if(event.data.type === 'METIS_PORTAL_READY' || event.data.type === 'PUPA_PORTAL_READY') {
-            channel.postMessage({ type: 'MAIN_APP_STATE_UPDATE', payload: appState });
+    channel.onmessage = async (event) => {
+        if (event.data.type === 'METIS_PORTAL_READY' || event.data.type === 'PUPA_PORTAL_READY') {
+            debugLog(`[PORTAL_EVENT] Received ${event.data.type}. Preparing state...`);
+            // Revert to the original developer's likely intent: a deep, sanitized clone
+            // of the state. This is safer than a shallow copy if other unserializable
+            // properties exist. The `JSON.stringify` will strip functions and convert
+            // Blobs to `{}`, which we will then fix.
+            const portalState = JSON.parse(JSON.stringify(appState));
+            debugLog('[PORTAL_EVENT] State after stringify/parse (Blobs will be {}). VFS Keys:', Object.keys(portalState.vfsBlob));
+            
+            // Now, explicitly fix the VFS part, which was broken by stringify.
+            // This replaces the empty VFS object with a correctly prepared one.
+            portalState.vfsBlob = await prepareVfsForPortal(appState.vfsBlob);
+            debugLog('[PORTAL_EVENT] State after preparing VFS. It should now have text content.');
+            
+            debugLog(`[PORTAL_EVENT] Sending MAIN_APP_STATE_UPDATE to portal. Payload snapshot:`, {
+                currentActiveTabId: portalState.currentActiveTabId,
+                vfsKeys: Object.keys(portalState.vfsBlob),
+                grimoireContentExists: !!portalState.vfsBlob[Object.keys(portalState.vfsBlob).find(p => p.endsWith('LLM_FLAWS_SPELLBOOK.json'))]
+            });
+            
+            // Send the clean, deep-cloned, and VFS-fixed state to the portal.
+            channel.postMessage({ type: 'MAIN_APP_STATE_UPDATE', payload: portalState });
+
         } else if(event.data.type === 'METIS_ACTION_InternalMonologue') {
             appState.lastUserAction = event.data.payload || appState.lastUserAction;
             processMetisMonologue(document.createElement('div')).then(() => {
@@ -581,10 +645,12 @@ export function initializeEventListeners() {
         if (event.data?.type === 'LIA_STUDIO_REQUEST_FILES') {
             const iframeSource = Array.from(document.querySelectorAll('iframe')).find(iframe => iframe.contentWindow === event.source);
             if (iframeSource?.src.startsWith('blob:')) {
-                const serializableFiles = Object.entries(appState.vfsBlob).map(([path, content]) => {
-                    const blob = getFileContentAsBlob(path);
-                    const size = blob instanceof Blob ? blob.size : 0;
-                    const url = blob instanceof Blob ? URL.createObjectURL(blob) : '#';
+                const serializableFiles = Object.entries(appState.vfsBlob)
+                .filter(([path]) => path !== '0index.html')
+                .map(([path, content]) => {
+                    const fileBlob = getFileContentAsBlob(path);
+                    const size = fileBlob instanceof Blob ? fileBlob.size : 0;
+                    const url = fileBlob instanceof Blob ? URL.createObjectURL(fileBlob) : '#';
                     return { 
                         name: path, 
                         type: getMimeType(path), 
@@ -616,7 +682,7 @@ export function initializeEventListeners() {
             dom.editorPaneTextarea.focus();
             appState.editorContent = dom.editorPaneTextarea.value;
         } catch (err) {
-            console.error('Failed to read clipboard contents: ', err);
+            debugLog('Failed to read clipboard contents: ', err);
         }
     });
 

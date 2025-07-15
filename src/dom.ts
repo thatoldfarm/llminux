@@ -95,11 +95,12 @@ export const settingsGroupHeaders = document.querySelectorAll<HTMLElement>('.set
 // Cara HUD & LIA State Elements
 export const toggleCaraHudButton = getElem<HTMLButtonElement>('toggle-cara-hud');
 export const toggleKernelHudButton = getElem<HTMLButtonElement>('toggle-kernel-hud');
+export const toggleMetisHudButton = getElem<HTMLButtonElement>('toggle-metis-hud');
 export const caraEvolveButton = getElem<HTMLButtonElement>('cara-evolve-button');
 export const caraDevolveButton = getElem<HTMLButtonElement>('cara-devolve-button');
 
-// Metis HUD & Portal Elements
-export const toggleMetisHudButton = getElem<HTMLButtonElement>('toggle-metis-hud');
+// Portal Launch Buttons
+export const launchLiaPortalButton = getElem<HTMLButtonElement>('launch-lia-portal');
 export const launchMetisPortalButton = getElem<HTMLButtonElement>('launch-metis-portal');
 export const launchPupaPortalButton = getElem<HTMLButtonElement>('launch-pupa-portal');
 
@@ -115,6 +116,28 @@ export const editorOpenSelect = getElem<HTMLSelectElement>('editor-open-select')
 export const editorOpenButton = getElem<HTMLButtonElement>('editor-open-button');
 export const editorWarningBanner = getElem<HTMLElement>('editor-warning-banner');
 export const editorWarningClose = getElem<HTMLElement>('editor-warning-close');
+
+// LIA Modal Elements
+export const liaModalOverlay = getElem<HTMLElement>('lia-modal-overlay');
+export const liaModalCloseButton = getElem<HTMLButtonElement>('lia-modal-close');
+export const liaModalTabNav = getElem<HTMLElement>('lia-modal-tab-nav');
+export const liaModalTabContent = getElem<HTMLElement>('lia-modal-tab-content');
+export const liaPanopticonTab = getElem<HTMLElement>('lia-panopticon-tab');
+export const liaKernelLogTab = getElem<HTMLElement>('lia-kernel-log-tab');
+export const liaGrimoireTab = getElem<HTMLElement>('lia-grimoire-tab');
+export const liaCompendiumTab = getElem<HTMLElement>('lia-compendium-tab');
+export const liaNexusTab = getElem<HTMLElement>('lia-nexus-tab');
+export const liaVfsShellTab = getElem<HTMLElement>('lia-vfs-shell-tab');
+export const liaEditorTab = getElem<HTMLElement>('lia-editor-tab');
+export const liaVfsShellContainer = getElem<HTMLElement>('lia-vfs-shell-container');
+export const liaVfsShellOutput = getElem<HTMLElement>('lia-vfs-shell-output');
+export const liaVfsShellInput = getElem<HTMLInputElement>('lia-vfs-shell-input');
+export const liaEditorToolbar = getElem<HTMLElement>('lia-editor-toolbar');
+export const liaEditorOpenSelect = getElem<HTMLSelectElement>('lia-editor-open-select');
+export const liaEditorOpenButton = getElem<HTMLButtonElement>('lia-editor-open-button');
+export const liaEditorSaveFilenameInput = getElem<HTMLInputElement>('lia-editor-save-filename-input');
+export const liaEditorSaveButton = getElem<HTMLButtonElement>('lia-editor-save-button');
+export const liaEditorTextarea = getElem<HTMLTextAreaElement>('lia-editor-textarea');
 
 // Metis Modal Elements
 export const metisModalOverlay = getElem<HTMLElement>('metis-modal-overlay');

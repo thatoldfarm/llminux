@@ -238,4 +238,10 @@ export type AppState = {
     vfsShellHistoryIndex: number;
     vfsViIsActive: boolean;
     vfsViCurrentFile: string | null;
+    debugMode: boolean;
+    // LIA Modal State
+    liaVfsShellHistory: string[];
+    liaVfsShellHistoryIndex: number;
+    liaEditorContent: string;
+    liaEditorCurrentFile: string | null;
 };

@@ -10,28 +10,38 @@ import { renderAllChatMessages, renderFileTree, switchTab, renderCaraHud, render
 import { switchFile } from './src/vfs';
 import { initializeCommands, initializeEventListeners } from './src/events';
 import { setAiInstance } from './src/services';
+import { debugLog } from "./src/utils";
 
 async function main() {
+    debugLog('main() started.');
     logPersistence("Initializing LIA Studio...");
     if (!process.env.API_KEY) {
         document.body.innerHTML = '<h1>Missing API Key</h1><p>Please set the API_KEY environment variable.</p>';
         logPersistence("CRITICAL: Missing API Key.");
+        console.error('CRITICAL: Missing API_KEY. Application halted.');
         return;
     }
+    debugLog('API_KEY found.');
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     setAiInstance(ai);
+    debugLog('Gemini AI instance created.');
 
     initializeEventListeners();
+    debugLog('Event listeners initialized.');
     await loadState();
+    debugLog('State loaded from persistence.');
     
     // Handle tab ID migration for old saved states
     if (appState.currentActiveTabId === 'cara-assistor-tab') {
         appState.currentActiveTabId = 'assistor-tab';
+        debugLog('Migrated cara-assistor-tab to assistor-tab.');
     }
 
     initializeCommands();
+    debugLog('Commands initialized.');
 
     logPersistence("State loaded. Rendering UI...");
+    debugLog('Applying saved AI settings to UI controls.');
     
     // Apply AI settings to UI controls
     if (dom.aiSettingsControls.model) dom.aiSettingsControls.model.value = appState.aiSettings.model;
@@ -54,20 +64,27 @@ async function main() {
         }
     });
 
+    debugLog('Initial UI rendering pass starting...');
     renderAllChatMessages();
     renderFileTree();
     renderAssetManager();
     renderCaraHud();
     renderKernelHud();
     renderMetisHud();
-    await switchFile(appState.activeFilePath || '');
+    debugLog('Initial UI rendering pass finished.');
+    
+    debugLog(`Switching to initial file: "${appState.activeFilePath || '0index.html'}".`);
+    await switchFile(appState.activeFilePath || '0index.html');
+    debugLog(`Switching to initial tab: "${appState.currentActiveTabId}".`);
     await switchTab(appState.currentActiveTabId);
     
     // Collapse sidebars on startup as requested
+    debugLog('Collapsing sidebars on startup.');
     dom.leftSidebar?.classList.add('collapsed');
     dom.rightSidebar?.classList.add('collapsed');
 
     logPersistence("Initialization complete.");
+    debugLog('main() finished successfully.');
 }
 
 main().catch((err: any) => {

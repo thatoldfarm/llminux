@@ -5,7 +5,7 @@
 
 import { appState, LIA_BOOTSTRAP_FILENAME, LIA_UTILITIES_FILENAME, protocolConfigs, LIA_LINUX_COMMANDS_FILENAME, CARA_BOOTSTRAP_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, KINKSCAPE_FILENAMES, CARA_BOOTSTRAP_V2_FILENAME, LIA_COMMAND_LEGEND_FILENAME, METIS_BOOTSTRAP_FILENAME, METIS_SYSTEM_PROMPT_FILENAME, PUPA_SYSTEM_PROMPT_FILENAME } from './state';
 import { AppState, LiaState, MetisState, VFSBlob } from './types';
-import { getMimeType, blobToBase64, base64ToBlob } from './utils';
+import { getMimeType, blobToBase64, base64ToBlob, parseJsonc } from './utils';
 import { renderAllChatMessages, renderFileTree, switchTab, renderCaraHud, renderKernelHud, renderMetisHud } from './ui';
 import { resetLiaState, getAllStatesFromBootstrap } from './services';
 import { switchFile, getFileContentAsText, saveFileToVFS, getFileContentAsBlob } from './vfs';
@@ -99,6 +99,11 @@ export async function getSerializableStateObject() {
         lastUserAction: appState.lastUserAction,
         kernelHudVisible: appState.kernelHudVisible,
         metisHudVisible: appState.metisHudVisible,
+        debugMode: appState.debugMode,
+        liaVfsShellHistory: appState.liaVfsShellHistory,
+        liaVfsShellHistoryIndex: appState.liaVfsShellHistoryIndex,
+        liaEditorContent: appState.liaEditorContent,
+        liaEditorCurrentFile: appState.liaEditorCurrentFile,
     };
 }
 
@@ -108,7 +113,11 @@ export async function getSerializableState(): Promise<string> {
 }
 
 export async function loadFromSerialized(jsonString: string) {
-    const loadedData = JSON.parse(jsonString);
+    const loadedData = parseJsonc(jsonString, 'localStorage/vfs-snapshot');
+    if (!loadedData) {
+        logPersistence("CRITICAL: Failed to parse loaded state data.");
+        return;
+    }
 
     // Reconstruct vfsBlob
     appState.vfsBlob = {};
@@ -176,18 +185,30 @@ export async function loadFromSerialized(jsonString: string) {
     appState.lastUserAction = loadedData.lastUserAction || '';
     appState.kernelHudVisible = loadedData.kernelHudVisible || false;
     appState.metisHudVisible = loadedData.metisHudVisible || false;
+    appState.debugMode = loadedData.debugMode ?? true;
+    appState.liaVfsShellHistory = loadedData.liaVfsShellHistory || [];
+    appState.liaVfsShellHistoryIndex = loadedData.liaVfsShellHistoryIndex || -1;
+    appState.liaEditorContent = loadedData.liaEditorContent || '';
+    appState.liaEditorCurrentFile = loadedData.liaEditorCurrentFile || null;
 
     const utilsFileContent = await getFileContentAsText(LIA_UTILITIES_FILENAME);
     if (utilsFileContent) {
-        try {
-            appState.liaUtilitiesConfig = JSON.parse(utilsFileContent);
-        } catch(e) {
-            console.error("Failed to parse utilities config from saved state:", e);
-        }
+        appState.liaUtilitiesConfig = parseJsonc(utilsFileContent, LIA_UTILITIES_FILENAME);
     }
 
-    const kinkscapeFileContents = await Promise.all(KINKSCAPE_FILENAMES.map(name => getFileContentAsText(name)));
-    appState.caraState.kinkscapeData = kinkscapeFileContents.filter(Boolean).map(content => JSON.parse(content!));
+    const kinkscapePromises = KINKSCAPE_FILENAMES.map(async (path) => {
+        try {
+            const content = await getFileContentAsText(path);
+            if (content) {
+                return parseJsonc(content, path);
+            }
+        } catch (e) {
+            logPersistence(`ERROR: Failed to load or parse ${path}: ${(e as Error).message}`);
+        }
+        return null;
+    });
+    appState.caraState.kinkscapeData = (await Promise.all(kinkscapePromises)).filter(Boolean);
+
 
     // Re-save to local storage to update it
     saveStateToLocalStorage();
@@ -267,23 +288,22 @@ export async function loadState(): Promise<void> {
 
     const utilsContent = await getFileContentAsText(LIA_UTILITIES_FILENAME);
     if (utilsContent) {
-        try {
-            appState.liaUtilitiesConfig = JSON.parse(utilsContent);
-            logPersistence(`Parsed ${LIA_UTILITIES_FILENAME}`);
-        } catch (e) {
-            logPersistence(`ERROR: Failed to parse ${LIA_UTILITIES_FILENAME}: ${(e as Error).message}`);
-        }
+        appState.liaUtilitiesConfig = parseJsonc(utilsContent, LIA_UTILITIES_FILENAME);
+        if(appState.liaUtilitiesConfig) logPersistence(`Parsed ${LIA_UTILITIES_FILENAME}`);
     }
     
-    const kinkscapeContents = await Promise.all(KINKSCAPE_FILENAMES.map(name => getFileContentAsText(name)));
-    appState.caraState.kinkscapeData = kinkscapeContents
-        .filter((content): content is string => !!content)
-        .map(content => {
-            try { return JSON.parse(content); } catch (e) {
-                logPersistence(`ERROR: Failed to parse kinkscape file: ${(e as Error).message}`);
-                return null;
+    const kinkscapePromises = KINKSCAPE_FILENAMES.map(async (path) => {
+        try {
+            const content = await getFileContentAsText(path);
+            if (content) {
+                return parseJsonc(content, path);
             }
-        }).filter(Boolean);
+        } catch (e) {
+            logPersistence(`ERROR: Failed to load or parse ${path}: ${(e as Error).message}`);
+        }
+        return null;
+    });
+    appState.caraState.kinkscapeData = (await Promise.all(kinkscapePromises)).filter(Boolean);
 
     await resetLiaState();
 

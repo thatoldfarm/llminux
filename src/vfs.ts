@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -24,8 +22,18 @@ export function getFileContentAsBlob(path: string): Blob | any[] | undefined {
 
 export async function getFileContentAsText(path: string): Promise<string | undefined> {
     const content = appState.vfsBlob[path];
+    if (content === undefined) {
+        console.warn(`[VFS] Content for path "${path}" is undefined.`);
+        return undefined;
+    }
+
     if (content instanceof Blob) {
-        return await content.text();
+        try {
+            return await content.text();
+        } catch (e) {
+            console.error(`[VFS] Error converting Blob to text for "${path}":`, e);
+            return undefined;
+        }
     }
     if (typeof content === 'string') {
         return content;
@@ -33,8 +41,10 @@ export async function getFileContentAsText(path: string): Promise<string | undef
      if (Array.isArray(content)) {
         return JSON.stringify(content, null, 2);
     }
+    console.warn(`[VFS] Content for path "${path}" is of an unknown type: ${typeof content}.`);
     return undefined;
 }
+
 
 export function saveFileToVFS(filePath: string, content: string | Blob) {
     const blob = content instanceof Blob ? content : new Blob([content], { type: getMimeType(filePath) });
@@ -229,8 +239,18 @@ export async function processVfsShellCommand(command: string): Promise<CommandOu
             }
             return await enterViMode(tokens[1]);
         case 'clear':
+            console.clear();
             if (dom.vfsShellOutput) dom.vfsShellOutput.innerHTML = '';
-            return { output: '' };
+            return { output: '<<CLEAR>>' };
+        case 'debug':
+            if (tokens[1] === 'on') {
+                appState.debugMode = true;
+                return { output: 'Debug logging enabled.' };
+            } else if (tokens[1] === 'off') {
+                appState.debugMode = false;
+                return { output: 'Debug logging disabled.' };
+            }
+            return { output: `Debug logging is currently ${appState.debugMode ? 'ON' : 'OFF'}. Usage: debug <on|off>`};
         case 'help':
             const helpText = [
                 'LIA Virtual Shell Commands:',
@@ -238,8 +258,9 @@ export async function processVfsShellCommand(command: string): Promise<CommandOu
                 '  `cat <file>`      - Display file content. e.g., `cat /etc/lia_kernel.conf`',
                 '  `echo "..." > <file>` - Write text to a file. Overwrites existing files.',
                 '  `vi <file>`       - Edit or create a file. Use Ctrl+S to save/exit, Ctrl+Q to quit.',
+                '  `debug <on|off>`  - Enable or disable verbose debug logging to the browser console.',
                 '  `state`           - Display the current system state vector.',
-                '  `clear`           - Clear the terminal screen.',
+                '  `clear`           - Clear the VFS shell and browser console.',
                 '  `help`            - Show this help message.',
                 '\n  Navigation uses standard Linux-like paths. All paths are absolute from /.'
             ].join('\n');

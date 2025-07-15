@@ -1,4 +1,6 @@
 
+
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -10,7 +12,7 @@ import { StateDefinition, LiaState, ChatMessage, LiaUtilityDefinition, LiaUtilit
 import { getFileContentAsText, saveFileToVFS, deleteFileFromVFS } from './vfs';
 import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud, renderMetisChatModal, renderPupaChatModal, renderFileTree, renderEditorTab } from './ui';
 import { saveStateToLocalStorage } from "./persistence";
-import { scrollToBottom } from "./utils";
+import { scrollToBottom, parseJsonc } from "./utils";
 import * as dom from './dom';
 
 let ai: GoogleGenAI;
@@ -20,16 +22,25 @@ export function setAiInstance(instance: GoogleGenAI) {
 }
 
 export async function getAllStatesFromBootstrap(): Promise<StateDefinition[]> {
+    console.log("[Debug][getAllStates] Started.");
     try {
+        console.log(`[Debug][getAllStates] Awaiting file content for: ${LIA_BOOTSTRAP_FILENAME}`);
         const bootstrapFileContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
+        console.log("[Debug][getAllStates] Got file content.");
+
         if (!bootstrapFileContent || typeof bootstrapFileContent !== 'string') {
             console.error("Bootstrap file not found or is not a string in VFS. Cannot get states.");
             return [];
         }
         
-        const bootstrap = JSON.parse(bootstrapFileContent);
+        console.log("[Debug][getAllStates] Parsing JSON content...");
+        const bootstrap = parseJsonc(bootstrapFileContent, LIA_BOOTSTRAP_FILENAME);
+        console.log("[Debug][getAllStates] JSON parsed successfully.");
+
         const metrics = bootstrap.SYSTEM_STATE_METRICS?.metrics || [];
         const qualitativeStatesDef = bootstrap.SYSTEM_STATE_QUALITATIVE?.states || [];
+
+        console.log(`[Debug][getAllStates] Found ${metrics.length} quantitative and ${qualitativeStatesDef.length} qualitative states.`);
 
         const qualitativeStates = qualitativeStatesDef.map((s: any) => ({
             id: s.id,
@@ -39,12 +50,15 @@ export async function getAllStatesFromBootstrap(): Promise<StateDefinition[]> {
             range: undefined
         }));
         
-        return [...metrics, ...qualitativeStates];
+        const combined = [...metrics, ...qualitativeStates];
+        console.log(`[Debug][getAllStates] Finished. Returning ${combined.length} total states.`);
+        return combined;
     } catch (e) {
         console.error("Failed to parse states from bootstrap:", e);
         return [];
     }
 }
+
 
 export async function resetLiaState() {
     const newLiaState: LiaState = {};
@@ -273,7 +287,7 @@ export async function processLiaKernelResponse(history: ChatMessage[], thinkingB
 
         const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
         if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or is not text.");
-        const bootstrap = JSON.parse(bootstrapContent);
+        const bootstrap = parseJsonc(bootstrapContent, LIA_BOOTSTRAP_FILENAME);
         
         let systemPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.LIA_OS?.prompt_template;
         if (!systemPromptTemplate) throw new Error("LIA_OS prompt template not found in bootstrap.");
@@ -346,7 +360,7 @@ export async function processLiaAssistantResponse(history: ChatMessage[], thinki
     try {
         const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
         if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or is not text.");
-        const bootstrap = JSON.parse(bootstrapContent);
+        const bootstrap = parseJsonc(bootstrapContent, LIA_BOOTSTRAP_FILENAME);
         
         let systemPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.LIA_Assistant_ReadOnly?.prompt_template;
         if (!systemPromptTemplate) throw new Error("LIA_Assistant_ReadOnly prompt template not found.");
@@ -376,7 +390,7 @@ export async function processCodeAssistantResponse(history: ChatMessage[], think
      try {
         const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
         if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or not text.");
-        const bootstrap = JSON.parse(bootstrapContent);
+        const bootstrap = parseJsonc(bootstrapContent, LIA_BOOTSTRAP_FILENAME);
         
         let systemPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.Code_Assistant_Generic?.prompt_template;
         if (!systemPromptTemplate) throw new Error("Code_Assistant_Generic prompt template not found.");
@@ -419,7 +433,7 @@ export async function processFsUtilResponse(history: ChatMessage[], thinkingBubb
     try {
         const bootstrapContent = await getFileContentAsText(LIA_BOOTSTRAP_FILENAME);
         if (!bootstrapContent || typeof bootstrapContent !== 'string') throw new Error("LIA Bootstrap file not loaded or not text.");
-        const bootstrap = JSON.parse(bootstrapContent);
+        const bootstrap = parseJsonc(bootstrapContent, LIA_BOOTSTRAP_FILENAME);
         
         const fsUtilPromptTemplate = bootstrap?.EMBEDDED_SYSTEM_PROMPTS?.protocols?.Fs_Util?.prompt_template;
         if (!fsUtilPromptTemplate) throw new Error("Fs_Util prompt template not found in bootstrap.");
@@ -496,7 +510,7 @@ async function processCaraUnevolved(history: ChatMessage[]) {
     
     let bootstrapContentForPrompt: string;
     try {
-        const parsedJson = JSON.parse(bootstrapJsonContent);
+        const parsedJson = parseJsonc(bootstrapJsonContent, appState.caraState.activeBootstrapFile);
         bootstrapContentForPrompt = JSON.stringify(parsedJson, null, 2); // Pretty-print for readability
     } catch (e) {
         // Fallback for non-JSON content or parsing errors
@@ -792,9 +806,9 @@ export async function handleProtocolSend(history: ChatMessage[], thinkingBubble:
         if (protocol === 'help') {
             const uiCommands = appState.commandPaletteCommands.map(c => `- ${c.name} (${c.section})`).join('\\n');
             const legendFile = await getFileContentAsText(LIA_COMMAND_LEGEND_FILENAME);
-            const legendCommands = (legendFile && typeof legendFile === 'string') ? JSON.stringify(JSON.parse(legendFile).categories, null, 2) : 'Not available.';
+            const legendCommands = (legendFile && typeof legendFile === 'string') ? JSON.stringify(parseJsonc(legendFile, LIA_COMMAND_LEGEND_FILENAME).categories, null, 2) : 'Not available.';
             const linuxFile = await getFileContentAsText(LIA_LINUX_COMMANDS_FILENAME);
-            const linuxCommands = (linuxFile && typeof linuxFile === 'string') ? JSON.stringify(JSON.parse(linuxFile).command_list, null, 2) : 'Not available.';
+            const linuxCommands = (linuxFile && typeof linuxFile === 'string') ? JSON.stringify(parseJsonc(linuxFile, LIA_LINUX_COMMANDS_FILENAME).command_list, null, 2) : 'Not available.';
 
             finalSystemInstruction = finalSystemInstruction
                 .replace('%%UI_COMMANDS%%', uiCommands)

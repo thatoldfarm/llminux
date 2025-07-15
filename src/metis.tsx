@@ -2,6 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+import { parse } from "jsonc-parser";
+import { debugLog } from "./utils";
 
 // --- STATE & COMMUNICATION ---
 let metisAppState: any = {}; // Local cache of the main app's state
@@ -23,7 +25,7 @@ metisHandshakeInterval = window.setInterval(metisSendReady, 100);
 metisHandshakeTimeout = window.setTimeout(() => {
     if (metisHandshakeInterval) {
         clearInterval(metisHandshakeInterval);
-        console.error('[PORTAL] Handshake timed out. No response from main app.');
+        console.error('Handshake timed out. No response from main app.');
         const metisAppEl = document.getElementById('app');
         if (metisAppEl && Object.keys(metisAppState).length === 0) { // Only show error if we never got state
             metisAppEl.innerHTML = `<div style="padding: 20px; text-align: center; font-size: 1.2em; color: var(--text-primary);">[PORTAL ERROR] Failed to establish communication with LIA Studio. Please close this window and try launching it again.</div>`;
@@ -45,6 +47,7 @@ metisChannel.onmessage = (event) => {
         metisHandshakeTimeout = null;
         
         console.log('[PORTAL] State received payload:', event.data.payload);
+        console.log('[PORTAL] Checking vfsBlob keys in received payload:', Object.keys(event.data.payload.vfsBlob || {}));
         metisAppState = event.data.payload;
         const metisAppEl = document.getElementById('app');
         if(metisAppEl) metisAppEl.style.display = 'flex'; // Ensure it's visible
@@ -195,22 +198,34 @@ function renderMetisPanopticon() {
 }
 
 function renderMetisGrimoire() {
-    if (!metisGrimoireTab || !metisAppState.vfsBlob) return;
+    console.log('[PORTAL] renderMetisGrimoire called.');
+    if (!metisGrimoireTab) { console.log('[PORTAL] Grimoire tab element not found.'); return; }
+    if (!metisAppState.vfsBlob) { console.log('[PORTAL] vfsBlob not found in received state.'); return; }
+    
+    console.log('[PORTAL] vfsBlob keys in Grimoire renderer:', Object.keys(metisAppState.vfsBlob));
 
     try {
         const spellbookPath = Object.keys(metisAppState.vfsBlob).find(p => p.endsWith('LLM_FLAWS_SPELLBOOK.json'));
         if (!spellbookPath) {
+             console.log('[PORTAL] Spellbook path not found in VFS.');
              metisGrimoireTab.innerHTML = `<p>Metis Exponentia Libri not found in VFS.</p>`;
             return;
         }
+        console.log(`[PORTAL] Found spellbook path: ${spellbookPath}`);
+
         const spellbookContent = metisAppState.vfsBlob[spellbookPath];
-        if (!spellbookContent || typeof spellbookContent !== 'string') {
-            metisGrimoireTab.innerHTML = `<p>Metis Exponentia Libri content is not readable.</p>`;
+        console.log(`[PORTAL] Spellbook content type: ${typeof spellbookContent}`);
+        console.log(`[PORTAL] Spellbook content (first 100 chars): ${String(spellbookContent).substring(0, 100)}...`);
+        
+        const spellbook = parse(spellbookContent);
+        if (!spellbook) {
+            console.log('[PORTAL] Parsing spellbook content resulted in null.');
+            metisGrimoireTab.innerHTML = `<p>Error parsing spellbook. Content might be invalid.</p>`;
             return;
         }
 
-        const spellbook = JSON.parse(spellbookContent);
         const spells = spellbook.legend_entries || [];
+        console.log(`[PORTAL] Found ${spells.length} spells.`);
 
         let html = `<div class="panopticon-header">Metis Exponentia Libri</div>`;
         html += `<div class="grimoire-grid">`;
@@ -227,31 +242,41 @@ function renderMetisGrimoire() {
         });
         html += `</div>`;
         metisGrimoireTab.innerHTML = html;
+        console.log('[PORTAL] Grimoire rendered successfully.');
 
     } catch (e) {
         console.error("Failed to render Grimoire:", e);
-        metisGrimoireTab.innerHTML = `<p>Error loading spellbook.</p>`;
+        console.log("Error during Grimoire render:", e);
+        metisGrimoireTab.innerHTML = `<p>Error loading spellbook. Check console.</p>`;
     }
 }
 
 function renderMetisCompendium() {
-    if (!metisCompendiumTab || !metisAppState.vfsBlob) return;
+    console.log('[PORTAL] renderMetisCompendium called.');
+    if (!metisCompendiumTab) { console.log('[PORTAL] Compendium tab element not found.'); return; }
+    if (!metisAppState.vfsBlob) { console.log('[PORTAL] vfsBlob not found in Compendium renderer.'); return; }
 
     try {
         const compendiumPath = Object.keys(metisAppState.vfsBlob).find(p => p.endsWith('Operators_Master_List_v1.json'));
         if (!compendiumPath) {
+            console.log('[PORTAL] Compendium path not found in VFS.');
             metisCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum not found in VFS.</p>`;
             return;
         }
+        console.log(`[PORTAL] Found compendium path: ${compendiumPath}`);
         
         const compendiumContent = metisAppState.vfsBlob[compendiumPath];
-        if (!compendiumContent || typeof compendiumContent !== 'string') {
-            metisCompendiumTab.innerHTML = `<p>Compendium Operatorum Divinum content is not readable.</p>`;
-            return;
+        console.log(`[PORTAL] Compendium content type: ${typeof compendiumContent}`);
+
+        const compendium = parse(compendiumContent);
+        if(!compendium) {
+             console.log('[PORTAL] Parsing compendium content resulted in null.');
+             metisCompendiumTab.innerHTML = `<p>Error parsing compendium. Content might be invalid.</p>`;
+             return;
         }
 
-        const compendium = JSON.parse(compendiumContent);
         const operators = compendium.operators || [];
+        console.log(`[PORTAL] Found ${operators.length} operators.`);
 
         let html = `<div class="panopticon-header">Compendium Operatorum Divinum</div>`;
         html += `<div class="compendium-grid">`;
@@ -267,10 +292,11 @@ function renderMetisCompendium() {
         });
         html += `</div>`;
         metisCompendiumTab.innerHTML = html;
-
+        console.log('[PORTAL] Compendium rendered successfully.');
     } catch(e) {
         console.error("Failed to render Compendium:", e);
-        metisCompendiumTab.innerHTML = `<p>Error loading operator compendium.</p>`;
+        console.log("Error during Compendium render:", e);
+        metisCompendiumTab.innerHTML = `<p>Error loading operator compendium. Check console.</p>`;
     }
 }
 
