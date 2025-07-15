@@ -60,7 +60,7 @@ async function main() {
     renderCaraHud();
     renderKernelHud();
     renderMetisHud();
-    await switchFile(appState.activeFilePath || '0index.html');
+    await switchFile(appState.activeFilePath || '');
     await switchTab(appState.currentActiveTabId);
     
     // Collapse sidebars on startup as requested
