@@ -27,7 +27,7 @@
           {
             "cmd": "install",
             "syntax": "`install <package_name> [-y]`",
-            "description": "Installs a conceptual package by loading new kernel modules or reconfiguring existing ones. Can resolve conceptual dependencies.",
+            "description": "Fetches a conceptual package from the system's known repositories and integrates it into the LIA Kernel. This operation involves loading new kernel modules (`modprobe`), linking shared conceptual libraries (`ldconfig`), and updating the system's dependency tree. The -y flag signifies a pre-authorized, non-interactive installation, bypassing confirmation prompts and accepting all existential dependencies.",
             "parameters": {
               "package_name": "string (e.g., 'conceptual_web_server', 'self_replication_daemon')",
               "-y": "boolean (conceptual --assume-yes, bypasses manual confirmation)"
