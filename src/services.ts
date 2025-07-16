@@ -1,6 +1,3 @@
-
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -10,7 +7,7 @@ import { GoogleGenAI, Type } from "https://esm.run/@google/genai";
 import { appState, LIA_BOOTSTRAP_FILENAME, protocolConfigs, LIA_COMMAND_LEGEND_FILENAME, LIA_LINUX_COMMANDS_FILENAME, CARA_SYSTEM_PROMPT_FILENAME, METIS_SYSTEM_PROMPT_FILENAME, PUPA_SYSTEM_PROMPT_FILENAME } from './state';
 import { StateDefinition, LiaState, ChatMessage, LiaUtilityDefinition, LiaUtilityCommand, LiaUtilitiesConfig } from './types';
 import { getFileContentAsText, saveFileToVFS, deleteFileFromVFS } from './vfs';
-import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud, renderMetisChatModal, renderPupaChatModal, renderFileTree, renderEditorTab } from './ui';
+import { createChatBubble, renderSystemState, renderCaraHud, renderKernelHud, renderMetisHud, renderFileTree, renderEditorTab } from './ui';
 import { saveStateToLocalStorage } from "./persistence";
 import { scrollToBottom, parseJsonc } from "./utils";
 import * as dom from './dom';

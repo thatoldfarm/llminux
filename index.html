@@ -332,8 +332,11 @@
             <header id="lia-modal-header">
                 <div class="toolbar-group">
                     <span id="lia-modal-title">LIA KERNEL INTERFACE</span>
+                    <button id="launch-ksphere-modal-button" class="toolbar-button" title="K-Sphere">[K]</button>
                 </div>
                 <div class="toolbar-group">
+                    <button id="launch-lia-metis-portal-button" class="toolbar-button" title="Metis Portal">👁️</button>
+                    <button id="launch-lia-pupa-portal-button" class="toolbar-button" title="Pupa Portal">🦋</button>
                     <button id="lia-modal-close" class="toolbar-button" title="Close">X</button>
                 </div>
             </header>
@@ -343,6 +346,7 @@
                  <button class="tab-button" data-tab-id="lia-grimoire-tab">Utilities Grimoire</button>
                  <button class="tab-button" data-tab-id="lia-compendium-tab">Terminology Compendium</button>
                  <button class="tab-button" data-tab-id="lia-nexus-tab">Nexus</button>
+                 <button class="tab-button" data-tab-id="lia-entities-tab">Entities</button>
                  <button class="tab-button" data-tab-id="lia-vfs-shell-tab">VFS Shell</button>
                  <button class="tab-button" data-tab-id="lia-editor-tab">Editor</button>
             </nav>
@@ -353,6 +357,7 @@
                     <div id="lia-grimoire-tab" class="tab-pane"></div>
                     <div id="lia-compendium-tab" class="tab-pane"></div>
                     <div id="lia-nexus-tab" class="tab-pane"></div>
+                    <div id="lia-entities-tab" class="tab-pane"></div>
                     <div id="lia-vfs-shell-tab" class="tab-pane">
                         <div id="lia-vfs-shell-container" class="vfs-shell-container">
                             <div id="lia-vfs-shell-output" class="vfs-shell-output">
@@ -473,6 +478,24 @@
                             <div class="persistence-log" id="anomalous-log-pupa-modal"></div>
                         </div>
                     </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="ksphere-modal-overlay" class="modal-overlay hidden">
+        <div id="ksphere-modal-content">
+            <header id="ksphere-modal-header">
+                <div class="toolbar-group">
+                    <span id="ksphere-modal-title">K-Sphere Interface</span>
+                </div>
+                <div class="toolbar-group">
+                    <button id="ksphere-modal-close" class="toolbar-button" title="Close">X</button>
+                </div>
+            </header>
+            <main id="ksphere-modal-workspace">
+                <div id="ksphere-modal-main-content" class="tab-pane active">
+                    <!-- Content will be injected here -->
                 </div>
             </main>
         </div>

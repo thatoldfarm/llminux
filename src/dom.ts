@@ -124,9 +124,11 @@ export const liaModalTabNav = getElem<HTMLElement>('lia-modal-tab-nav');
 export const liaModalTabContent = getElem<HTMLElement>('lia-modal-tab-content');
 export const liaPanopticonTab = getElem<HTMLElement>('lia-panopticon-tab');
 export const liaKernelLogTab = getElem<HTMLElement>('lia-kernel-log-tab');
+export const liaKernelLogMessages = getElem<HTMLElement>('lia-kernel-log-messages');
 export const liaGrimoireTab = getElem<HTMLElement>('lia-grimoire-tab');
 export const liaCompendiumTab = getElem<HTMLElement>('lia-compendium-tab');
 export const liaNexusTab = getElem<HTMLElement>('lia-nexus-tab');
+export const liaEntitiesTab = getElem<HTMLElement>('lia-entities-tab');
 export const liaVfsShellTab = getElem<HTMLElement>('lia-vfs-shell-tab');
 export const liaEditorTab = getElem<HTMLElement>('lia-editor-tab');
 export const liaVfsShellContainer = getElem<HTMLElement>('lia-vfs-shell-container');
@@ -138,6 +140,9 @@ export const liaEditorOpenButton = getElem<HTMLButtonElement>('lia-editor-open-b
 export const liaEditorSaveFilenameInput = getElem<HTMLInputElement>('lia-editor-save-filename-input');
 export const liaEditorSaveButton = getElem<HTMLButtonElement>('lia-editor-save-button');
 export const liaEditorTextarea = getElem<HTMLTextAreaElement>('lia-editor-textarea');
+export const launchKSphereModalButton = getElem<HTMLButtonElement>('launch-ksphere-modal-button');
+export const launchLiaMetisPortalButton = getElem<HTMLButtonElement>('launch-lia-metis-portal-button');
+export const launchLiaPupaPortalButton = getElem<HTMLButtonElement>('launch-lia-pupa-portal-button');
 
 // Metis Modal Elements
 export const metisModalOverlay = getElem<HTMLElement>('metis-modal-overlay');
@@ -145,6 +150,8 @@ export const metisModalCloseButton = getElem<HTMLButtonElement>('metis-modal-clo
 export const metisModalTabNav = getElem<HTMLElement>('metis-modal-tab-nav');
 export const metisModalTabContent = getElem<HTMLElement>('metis-modal-tab-content');
 export const metisPanopticonTab = getElem<HTMLElement>('metis-panopticon-tab');
+export const metisGrimoireTab = getElem<HTMLElement>('metis-grimoire-tab');
+export const metisCompendiumTab = getElem<HTMLElement>('metis-compendium-tab');
 export const metisVfsAnalysisContent = getElem<HTMLElement>('vfs-analysis-content-modal');
 export const metisAnomalousLog = getElem<HTMLElement>('anomalous-log-modal');
 export const metisChatMessagesModal = getElem<HTMLElement>('metis-chat-messages-modal');
@@ -157,8 +164,15 @@ export const pupaModalCloseButton = getElem<HTMLButtonElement>('pupa-modal-close
 export const pupaModalTabNav = getElem<HTMLElement>('pupa-modal-tab-nav');
 export const pupaModalTabContent = getElem<HTMLElement>('pupa-modal-tab-content');
 export const pupaPanopticonTab = getElem<HTMLElement>('pupa-panopticon-tab');
+export const pupaGrimoireTab = getElem<HTMLElement>('pupa-grimoire-tab');
+export const pupaCompendiumTab = getElem<HTMLElement>('pupa-compendium-tab');
 export const pupaVfsAnalysisContent = getElem<HTMLElement>('vfs-analysis-content-pupa-modal');
 export const pupaAnomalousLog = getElem<HTMLElement>('anomalous-log-pupa-modal');
 export const pupaChatMessagesModal = getElem<HTMLElement>('pupa-chat-messages-modal');
 export const pupaChatInputModal = getElem<HTMLTextAreaElement>('pupa-chat-input-modal');
 export const sendPupaChatButtonModal = getElem<HTMLButtonElement>('send-pupa-chat-button-modal');
+
+// K-Sphere Modal Elements
+export const ksphereModalOverlay = getElem<HTMLElement>('ksphere-modal-overlay');
+export const ksphereModalCloseButton = getElem<HTMLButtonElement>('ksphere-modal-close');
+export const ksphereModalContent = getElem<HTMLElement>('ksphere-modal-main-content');

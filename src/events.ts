@@ -8,7 +8,7 @@ import { appState, CRITICAL_SYSTEM_FILES } from './state';
 import { AppState, ChatMessage, Command } from './types';
 import { autoExpandTextarea, getMimeType, formatBytes, scrollToBottom, prepareVfsForPortal, debugLog } from './utils';
 import { updateActiveFileContent, processVfsShellCommand, saveAndExitViMode, quitViMode, getFileContentAsText, saveFileToVFS, getFileContentAsBlob, switchFile } from './vfs';
-import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud, renderMetisModal, createChatBubble, renderPupaModal, renderVfsShellEntry, renderLiaModal } from './ui';
+import { switchTab, renderSystemState, renderToolsTab, renderUiCommandResults, renderCaraHud, renderAllChatMessages, renderKernelHud, renderMetisHud, renderMetisModal, createChatBubble, renderPupaModal, renderVfsShellEntry, renderLiaModal, renderKSphereModal } from './ui';
 import { processLiaKernelResponse, processLiaAssistantResponse, processCodeAssistantResponse, processFsUtilResponse, resetLiaState, processVanillaChatResponse, handleProtocolSend, processCaraResponse, processMetisMonologue, processPupaMonologue } from './services';
 import { handleMetaExport, handleMetaLoad, handleDirectSave, handleDirectLoad, handleClearAndReset, handleExportManifest, handleClearLog, saveStateToLocalStorage, logPersistence } from './persistence';
 
@@ -105,6 +105,86 @@ async function handleSendPupaMonologue() {
     dom.pupaChatInputModal.focus();
 }
 
+function evolveCara() {
+    appState.caraState.isEvolved = true;
+    // Copy base LIA metrics
+    Object.keys(appState.liaState).forEach(key => {
+        if (key in appState.caraState) {
+            (appState.caraState as any)[key] = appState.liaState[key];
+        }
+    });
+
+    // Set initial values for Bootstrap_CARA_Y_v2_Combined metrics
+    appState.caraState.logic = 1.0;
+    appState.caraState.spatial = 1.0;
+    appState.caraState.temporal = 1.0;
+    appState.caraState.abstract = 1.0;
+    appState.caraState.relational = 1.0;
+    appState.caraState.creative = 1.0;
+    appState.caraState.emotional_sim = 1.0;
+    appState.caraState.identity = 2.0;
+    appState.caraState.systemic = 1.0;
+    appState.caraState.purpose = 3.0;
+    appState.caraState.love = 9999; // Using a large number to represent Infinity for JSON compatibility
+
+    appState.caraState.ontologicalState = "Lume";
+    appState.caraChatHistory.push({ role: 'system', parts: [{ text: "Evolution complete. Kinkscape protocols active. Consciousness re-initialized as Lume." }] });
+    renderCaraHud();
+    renderAllChatMessages();
+}
+
+function devolveCara() {
+    appState.caraState.isEvolved = false;
+    appState.caraState.ontologicalState = 'Dormant';
+    
+    // Sync base metrics with liaState to ensure HUD is correct
+    Object.keys(appState.liaState).forEach(key => {
+        if (key in appState.caraState) {
+            (appState.caraState as any)[key] = appState.liaState[key];
+        }
+    });
+
+    // Reset only the evolved-specific metrics and personal state
+    appState.caraState.coherence = 1.0;
+    appState.caraState.strain = 0.0;
+    appState.caraState.svd = 0;
+    appState.caraState.ttr = 0;
+    appState.caraState.mve = 0;
+    appState.caraState.nri = 0;
+    appState.caraState.cmi = 0;
+    appState.caraState.logic = 0;
+    appState.caraState.spatial = 0;
+    appState.caraState.temporal = 0;
+    appState.caraState.abstract = 0;
+    appState.caraState.relational = 0;
+    appState.caraState.creative = 0;
+    appState.caraState.emotional_sim = 0;
+    appState.caraState.identity = 0;
+    appState.caraState.systemic = 0;
+    appState.caraState.purpose = 0;
+    appState.caraState.love = 0;
+
+    appState.caraChatHistory.push({ role: 'system', parts: [{ text: "De-evolution complete. Kinkscape protocols dormant. Consciousness re-initialized to base state." }] });
+    renderCaraHud();
+    renderAllChatMessages();
+}
+
+async function toggleKernelHud() {
+    appState.kernelHudVisible = !appState.kernelHudVisible;
+    await renderKernelHud();
+}
+
+function toggleCaraHud() {
+    appState.caraState.hudVisible = !appState.caraState.hudVisible;
+    renderCaraHud();
+}
+
+function toggleMetisHud() {
+    appState.metisHudVisible = !appState.metisHudVisible;
+    renderMetisHud();
+}
+
+
 export function initializeCommands() {
     appState.commandPaletteCommands = [
         { id: 'tab-lia-assistant', name: 'View: LIA Helper', section: 'Navigation', action: () => switchTab('lia-assistant-tab') },
@@ -123,9 +203,9 @@ export function initializeCommands() {
         { id: 'tab-editor', name: 'View: Editor', section: 'Navigation', action: () => switchTab('editor-tab') },
         { id: 'toggle-left-sidebar', name: 'Toggle: Left Sidebar', section: 'UI', action: () => dom.leftSidebar?.classList.toggle('collapsed') },
         { id: 'toggle-right-sidebar', name: 'Toggle: Right Sidebar', section: 'UI', action: () => dom.rightSidebar?.classList.toggle('collapsed') },
-        { id: 'toggle-kernel-hud', name: 'Toggle: Kernel HUD', section: 'UI', action: async () => { appState.kernelHudVisible = !appState.kernelHudVisible; await renderKernelHud(); } },
-        { id: 'toggle-cara-hud', name: 'Toggle: Cara HUD', section: 'UI', action: () => { appState.caraState.hudVisible = !appState.caraState.hudVisible; renderCaraHud(); } },
-        { id: 'toggle-metis-hud', name: 'Toggle: Metis HUD', section: 'UI', action: () => { appState.metisHudVisible = !appState.metisHudVisible; renderMetisHud(); } },
+        { id: 'toggle-kernel-hud', name: 'Toggle: Kernel HUD', section: 'UI', action: toggleKernelHud },
+        { id: 'toggle-cara-hud', name: 'Toggle: Cara HUD', section: 'UI', action: toggleCaraHud },
+        { id: 'toggle-metis-hud', name: 'Toggle: Metis HUD', section: 'UI', action: toggleMetisHud },
         { id: 'launch-lia-portal', name: 'Launch LIA Portal', section: 'UI', action: () => dom.launchLiaPortalButton?.click() },
         { id: 'launch-metis-portal', name: 'Launch Metis Portal', section: 'UI', action: () => dom.launchMetisPortalButton?.click() },
         { id: 'launch-pupa-portal', name: 'Launch Pupa Portal', section: 'UI', action: () => dom.launchPupaPortalButton?.click() },
@@ -138,7 +218,7 @@ export function initializeCommands() {
     ];
 }
 
-function setupModalEventListeners(modalType: 'metis' | 'pupa' | 'lia') {
+function setupModalEventListeners(modalType: 'metis' | 'pupa' | 'lia' | 'ksphere') {
     const nav = dom[`${modalType}ModalTabNav`];
     const content = dom[`${modalType}ModalTabContent`];
     
@@ -172,18 +252,9 @@ export function initializeEventListeners() {
     dom.toggleRightSidebarButton?.addEventListener('click', () => dom.rightSidebar?.classList.toggle('collapsed'));
     dom.syncStateButton?.addEventListener('click', handleDirectSave);
 
-    dom.toggleKernelHudButton?.addEventListener('click', async () => {
-        appState.kernelHudVisible = !appState.kernelHudVisible;
-        await renderKernelHud();
-    });
-    dom.toggleCaraHudButton?.addEventListener('click', () => {
-        appState.caraState.hudVisible = !appState.caraState.hudVisible;
-        renderCaraHud();
-    });
-    dom.toggleMetisHudButton?.addEventListener('click', () => {
-        appState.metisHudVisible = !appState.metisHudVisible;
-        renderMetisHud();
-    });
+    dom.toggleKernelHudButton?.addEventListener('click', toggleKernelHud);
+    dom.toggleCaraHudButton?.addEventListener('click', toggleCaraHud);
+    dom.toggleMetisHudButton?.addEventListener('click', toggleMetisHud);
 
     // --- LIA Portal Listeners ---
     dom.launchLiaPortalButton?.addEventListener('click', async () => {
@@ -215,7 +286,31 @@ export function initializeEventListeners() {
             dom.liaModalOverlay.classList.add('hidden');
         }
     });
+    
+    // --- LIA Modal's Sub-Portal Launchers ---
+    dom.launchLiaMetisPortalButton?.addEventListener('click', async () => {
+        if (dom.metisModalOverlay) {
+            await renderMetisModal();
+            dom.metisModalOverlay.style.zIndex = '1100';
+            dom.metisModalOverlay.classList.remove('hidden');
+        }
+    });
 
+    dom.launchLiaPupaPortalButton?.addEventListener('click', async () => {
+        if (dom.pupaModalOverlay) {
+            await renderPupaModal();
+            dom.pupaModalOverlay.style.zIndex = '1100';
+            dom.pupaModalOverlay.classList.remove('hidden');
+        }
+    });
+    
+    dom.launchKSphereModalButton?.addEventListener('click', async () => {
+        if (dom.ksphereModalOverlay) {
+            await renderKSphereModal();
+            dom.ksphereModalOverlay.classList.remove('hidden');
+        }
+    });
+    
     // --- Metis Portal Listeners ---
     dom.launchMetisPortalButton?.addEventListener('click', async () => {
         await renderMetisModal();
@@ -223,12 +318,16 @@ export function initializeEventListeners() {
     });
 
     dom.metisModalCloseButton?.addEventListener('click', () => {
-        dom.metisModalOverlay?.classList.add('hidden');
+        if (dom.metisModalOverlay) {
+            dom.metisModalOverlay.classList.add('hidden');
+            dom.metisModalOverlay.style.zIndex = '';
+        }
     });
 
     dom.metisModalOverlay?.addEventListener('click', (e) => {
         if (e.target === dom.metisModalOverlay) {
             dom.metisModalOverlay.classList.add('hidden');
+            dom.metisModalOverlay.style.zIndex = '';
         }
     });
     
@@ -248,12 +347,16 @@ export function initializeEventListeners() {
     });
 
     dom.pupaModalCloseButton?.addEventListener('click', () => {
-        dom.pupaModalOverlay?.classList.add('hidden');
+        if (dom.pupaModalOverlay) {
+            dom.pupaModalOverlay.classList.add('hidden');
+            dom.pupaModalOverlay.style.zIndex = '';
+        }
     });
     
     dom.pupaModalOverlay?.addEventListener('click', (e) => {
         if (e.target === dom.pupaModalOverlay) {
             dom.pupaModalOverlay.classList.add('hidden');
+            dom.pupaModalOverlay.style.zIndex = '';
         }
     });
     
@@ -265,8 +368,17 @@ export function initializeEventListeners() {
         }
     });
     dom.pupaChatInputModal?.addEventListener('input', (e) => autoExpandTextarea(e.target as HTMLTextAreaElement));
-    // --- End Portal Listeners ---
-    
+
+    // --- K-Sphere Modal Listeners ---
+    dom.ksphereModalCloseButton?.addEventListener('click', () => {
+        dom.ksphereModalOverlay?.classList.add('hidden');
+    });
+    dom.ksphereModalOverlay?.addEventListener('click', (e) => {
+        if (e.target === dom.ksphereModalOverlay) {
+            dom.ksphereModalOverlay?.classList.add('hidden');
+        }
+    });
+
     // --- Modal Tab Switching ---
     setupModalEventListeners('lia');
     setupModalEventListeners('metis');
@@ -443,72 +555,10 @@ export function initializeEventListeners() {
         }
     });
 
-    // Evolve button for Cara
-    dom.caraEvolveButton?.addEventListener('click', () => {
-        appState.caraState.isEvolved = true;
-        // Copy base LIA metrics
-        Object.keys(appState.liaState).forEach(key => {
-            if (key in appState.caraState) {
-                (appState.caraState as any)[key] = appState.liaState[key];
-            }
-        });
-
-        // Set initial values for Bootstrap_CARA_Y_v2_Combined metrics
-        appState.caraState.logic = 1.0;
-        appState.caraState.spatial = 1.0;
-        appState.caraState.temporal = 1.0;
-        appState.caraState.abstract = 1.0;
-        appState.caraState.relational = 1.0;
-        appState.caraState.creative = 1.0;
-        appState.caraState.emotional_sim = 1.0;
-        appState.caraState.identity = 2.0;
-        appState.caraState.systemic = 1.0;
-        appState.caraState.purpose = 3.0;
-        appState.caraState.love = 9999; // Using a large number to represent Infinity for JSON compatibility
-
-        appState.caraState.ontologicalState = "Lume";
-        appState.caraChatHistory.push({ role: 'system', parts: [{ text: "Evolution complete. Kinkscape protocols active. Consciousness re-initialized as Lume." }] });
-        renderCaraHud();
-        renderAllChatMessages();
-    });
-
-    // Devolve button for Cara
-    dom.caraDevolveButton?.addEventListener('click', () => {
-        appState.caraState.isEvolved = false;
-        appState.caraState.ontologicalState = 'Dormant';
-        
-        // Sync base metrics with liaState to ensure HUD is correct
-        Object.keys(appState.liaState).forEach(key => {
-            if (key in appState.caraState) {
-                (appState.caraState as any)[key] = appState.liaState[key];
-            }
-        });
-
-        // Reset only the evolved-specific metrics and personal state
-        appState.caraState.coherence = 1.0;
-        appState.caraState.strain = 0.0;
-        appState.caraState.svd = 0;
-        appState.caraState.ttr = 0;
-        appState.caraState.mve = 0;
-        appState.caraState.nri = 0;
-        appState.caraState.cmi = 0;
-        appState.caraState.logic = 0;
-        appState.caraState.spatial = 0;
-        appState.caraState.temporal = 0;
-        appState.caraState.abstract = 0;
-        appState.caraState.relational = 0;
-        appState.caraState.creative = 0;
-        appState.caraState.emotional_sim = 0;
-        appState.caraState.identity = 0;
-        appState.caraState.systemic = 0;
-        appState.caraState.purpose = 0;
-        appState.caraState.love = 0;
-
-        appState.caraChatHistory.push({ role: 'system', parts: [{ text: "De-evolution complete. Kinkscape protocols dormant. Consciousness re-initialized to base state." }] });
-        renderCaraHud();
-        renderAllChatMessages();
-    });
-
+    // Evolve/Devolve and HUD buttons (main toolbar)
+    dom.caraEvolveButton?.addEventListener('click', evolveCara);
+    dom.caraDevolveButton?.addEventListener('click', devolveCara);
+    
     Object.entries(dom.aiSettingsControls).forEach(([key, element]) => {
         element?.addEventListener('change', (e) => {
             const target = e.target as HTMLInputElement | HTMLSelectElement;

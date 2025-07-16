@@ -252,12 +252,13 @@ export async function loadState(): Promise<void> {
         CARA_BOOTSTRAP_FILENAME,
         CARA_SYSTEM_PROMPT_FILENAME,
         CARA_BOOTSTRAP_V2_FILENAME,
-        '/bootstrap/kernel/LIA_MASTER_BOOTSTRAP_v7.1_Absolute_Kernel_Root_Edition_Refined.json',
+        '/public/bootstrap/kernel/LIA_MASTER_BOOTSTRAP_v7.1_Absolute_Kernel_Root_Edition_Refined.json',
         LIA_COMMAND_LEGEND_FILENAME,
         LIA_LINUX_COMMANDS_FILENAME,
         METIS_BOOTSTRAP_FILENAME,
         METIS_SYSTEM_PROMPT_FILENAME,
         PUPA_SYSTEM_PROMPT_FILENAME,
+        '/public/inconstants/4-bit-binary_strings_with_metadata_small.json',
         ...Object.values(protocolConfigs).map(p => p.promptFile),
         ...KINKSCAPE_FILENAMES
     ];

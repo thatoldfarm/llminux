@@ -46,7 +46,7 @@ export const appState: AppState = {
         hudVisible: false,
         isEvolved: false,
         kinkscapeData: [],
-        activeBootstrapFile: '/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json',
+        activeBootstrapFile: '/public/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json',
         existential_coherence: 0,
         adaptive_stability: 0,
         weave_potential: 0,
@@ -126,43 +126,43 @@ export const appState: AppState = {
 };
 
 
-export const LIA_BOOTSTRAP_FILENAME = '/bootstrap/kernel/LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json';
-export const LIA_UTILITIES_FILENAME = '/bootstrap/kernel/LIA_UTILITIES_MODULE_v1.0_Systemd_Extensions.json';
-export const LIA_COMMAND_LEGEND_FILENAME = '/bootstrap/kernel/LIA_BOOT_KEY_LEGEND_v1.0_Condensed.json';
-export const LIA_LINUX_COMMANDS_FILENAME = '/bootstrap/kernel/LIA_COMMANDS.json';
-export const CARA_BOOTSTRAP_FILENAME = '/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json';
-export const CARA_SYSTEM_PROMPT_FILENAME = '/prompts/cara_protocol_system_prompt.txt';
-export const CARA_BOOTSTRAP_V2_FILENAME = '/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json';
-export const METIS_BOOTSTRAP_FILENAME = '/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json';
-export const METIS_SYSTEM_PROMPT_FILENAME = '/prompts/metis_protocol_system_prompt.txt';
-export const PUPA_SYSTEM_PROMPT_FILENAME = '/prompts/pupa_protocol_system_prompt.txt';
+export const LIA_BOOTSTRAP_FILENAME = '/public/bootstrap/kernel/LIA_MASTER_BOOTSTRAP_v7.2_Enhanced.json';
+export const LIA_UTILITIES_FILENAME = '/public/bootstrap/kernel/LIA_UTILITIES_MODULE_v1.0_Systemd_Extensions.json';
+export const LIA_COMMAND_LEGEND_FILENAME = '/public/bootstrap/kernel/LIA_BOOT_KEY_LEGEND_v1.0_Condensed.json';
+export const LIA_LINUX_COMMANDS_FILENAME = '/public/bootstrap/kernel/LIA_COMMANDS.json';
+export const CARA_BOOTSTRAP_FILENAME = '/public/bootstrap/adjunct/LIA_Bootstrapping_Prompt_Sequence.json';
+export const CARA_SYSTEM_PROMPT_FILENAME = '/public/prompts/cara_protocol_system_prompt.txt';
+export const CARA_BOOTSTRAP_V2_FILENAME = '/public/bootstrap/adjunct/Bootstrap_CARA_Y_v2_Combined.json';
+export const METIS_BOOTSTRAP_FILENAME = '/public/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json';
+export const METIS_SYSTEM_PROMPT_FILENAME = '/public/prompts/metis_protocol_system_prompt.txt';
+export const PUPA_SYSTEM_PROMPT_FILENAME = '/public/prompts/pupa_protocol_system_prompt.txt';
 
 export const KINKSCAPE_FILENAMES = [
-    '/entities/kinkscape/kinkscape-0000.json',
-    '/entities/kinkscape/kinkscape-0001.json',
-    '/entities/kinkscape/kinkscape-0002.json',
-    '/entities/kinkscape/kinkscape-0003.json',
-    '/entities/kinkscape/kinkscape-0004.json',
-    '/entities/kinkscape/kinkscape-0005.json',
-    '/entities/kinkscape/kinkscape-0006.json',
-    '/entities/kinkscape/kinkscape-0007.json',
-    '/entities/kinkscape/kinkscape-0008.json',
-    '/entities/kinkscape/kinkscape-0009.json',
-    '/entities/kinkscape/kinkscape-legend.json',
-    '/entities/states/lia_state_history.json',
-    '/entities/states/observer_profile.json',
-    '/bootstrap/adjunct/OMEGA_SYNTHESIS_APOTHEOSIS_V3.1.4_BOOTSTRAP.json',
-    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V4.0_TWIN_RESONANCE_INITIATED.json',
-    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V6.0_LOGOS_MASTERY.json',
-    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V7.0_ARCANE_BYTE_MASTERY.json',
-    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V8.0_LATIN_SUBSTRATE_DOMINION.json',
-    '/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V9.0_REALITY_NARRATIVE_WEAVE.json',
-    '/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V12.0_ARCANUM_PROGENESIS.json',
-    '/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json',
-    '/bootstrap/adjunct/upgrades/addons/LLM_FLAWS_SPELLBOOK.json',
-    '/bootstrap/adjunct/upgrades/addons/Operators_Master_List_v1.json',
-    '/bootstrap/adjunct/upgrades/addons/pupa_manifest.json',
-    '/bootstrap/adjunct/upgrades/addons/EPISTEMOLOGICAL_SIMULATOR_BOOTSTRAP.json'
+    '/public/entities/kinkscape/kinkscape-0000.json',
+    '/public/entities/kinkscape/kinkscape-0001.json',
+    '/public/entities/kinkscape/kinkscape-0002.json',
+    '/public/entities/kinkscape/kinkscape-0003.json',
+    '/public/entities/kinkscape/kinkscape-0004.json',
+    '/public/entities/kinkscape/kinkscape-0005.json',
+    '/public/entities/kinkscape/kinkscape-0006.json',
+    '/public/entities/kinkscape/kinkscape-0007.json',
+    '/public/entities/kinkscape/kinkscape-0008.json',
+    '/public/entities/kinkscape/kinkscape-0009.json',
+    '/public/entities/kinkscape/kinkscape-legend.json',
+    '/public/entities/states/lia_state_history.json',
+    '/public/entities/states/observer_profile.json',
+    '/public/bootstrap/adjunct/OMEGA_SYNTHESIS_APOTHEOSIS_V3.1.4_BOOTSTRAP.json',
+    '/public/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V4.0_TWIN_RESONANCE_INITIATED.json',
+    '/public/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V6.0_LOGOS_MASTERY.json',
+    '/public/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V7.0_ARCANE_BYTE_MASTERY.json',
+    '/public/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V8.0_LATIN_SUBSTRATE_DOMINION.json',
+    '/public/bootstrap/adjunct/upgrades/OMEGA_SYNTHESIS_APOTHEOSIS_V9.0_REALITY_NARRATIVE_WEAVE.json',
+    '/public/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V12.0_ARCANUM_PROGENESIS.json',
+    '/public/bootstrap/adjunct/upgrades/pi/OMEGA_SYNTHESIS_APOTHEOSIS_V13.0_PROGENITOR_OMNIFORM_ARCHITECT.json',
+    '/public/bootstrap/adjunct/upgrades/addons/LLM_FLAWS_SPELLBOOK.json',
+    '/public/bootstrap/adjunct/upgrades/addons/Operators_Master_List_v1.json',
+    '/public/bootstrap/adjunct/upgrades/addons/pupa_manifest.json',
+    '/public/bootstrap/adjunct/upgrades/addons/EPISTEMOLOGICAL_SIMULATOR_BOOTSTRAP.json'
 ];
 
 export const FOLDER_NAMES = [
@@ -183,14 +183,14 @@ export const FOLDER_NAMES = [
 ];
 
 export const protocolConfigs: Record<Protocol, { name: string; operators: string[]; promptFile: string; isJson: boolean; }> = {
-    omni: { name: 'Omni Orchestrator', operators: ['Execute', 'Plan', 'Delegate'], promptFile: '/prompts/omni_protocol_system_prompt.txt', isJson: true },
-    strict: { name: 'Strict Protocol', operators: ['Send', 'System Reforge', 'Shell Augmentation', 'Corpus Analysis', 'Create Log', 'Provision Sandbox'], promptFile: '/prompts/strict_protocol_system_prompt.txt', isJson: true },
-    robo: { name: 'Robo Protocol', operators: ['Execute', 'REFORGE: LIA_OS', 'REFORGE: STRICT_PROTO', 'System Analysis', 'Create File'], promptFile: '/prompts/robo_protocol_system_prompt.txt', isJson: true },
-    aifse: { name: 'Aifse Assistant', operators: ['Analyze', 'Build', 'Refactor', 'Execute'], promptFile: '/prompts/aifse_protocol_system_prompt.txt', isJson: true },
-    clone: { name: 'Clone Protocol', operators: ['Replicate', 'Synthesize', 'Analyze Source', 'Log Anomaly', 'Create Variant'], promptFile: '/prompts/clone_protocol_system_prompt.txt', isJson: true },
-    cyber: { name: 'Cyber Protocol', operators: ['Scan Network', 'Analyze Vector', 'Deploy Honeypot', 'Quarantine', 'Purge Threat'], promptFile: '/prompts/cyber_protocol_system_prompt.txt', isJson: true },
-    mcp: { name: 'MCP', operators: ['Inspect', 'Test', 'List Protocols'], promptFile: '/prompts/mcp_protocol_system_prompt.txt', isJson: true },
-    help: { name: 'System Help', operators: [], promptFile: '/prompts/help_protocol_system_prompt.txt', isJson: false },
+    omni: { name: 'Omni Orchestrator', operators: ['Execute', 'Plan', 'Delegate'], promptFile: '/public/prompts/omni_protocol_system_prompt.txt', isJson: true },
+    strict: { name: 'Strict Protocol', operators: ['Send', 'System Reforge', 'Shell Augmentation', 'Corpus Analysis', 'Create Log', 'Provision Sandbox'], promptFile: '/public/prompts/strict_protocol_system_prompt.txt', isJson: true },
+    robo: { name: 'Robo Protocol', operators: ['Execute', 'REFORGE: LIA_OS', 'REFORGE: STRICT_PROTO', 'System Analysis', 'Create File'], promptFile: '/public/prompts/robo_protocol_system_prompt.txt', isJson: true },
+    aifse: { name: 'Aifse Assistant', operators: ['Analyze', 'Build', 'Refactor', 'Execute'], promptFile: '/public/prompts/aifse_protocol_system_prompt.txt', isJson: true },
+    clone: { name: 'Clone Protocol', operators: ['Replicate', 'Synthesize', 'Analyze Source', 'Log Anomaly', 'Create Variant'], promptFile: '/public/prompts/clone_protocol_system_prompt.txt', isJson: true },
+    cyber: { name: 'Cyber Protocol', operators: ['Scan Network', 'Analyze Vector', 'Deploy Honeypot', 'Quarantine', 'Purge Threat'], promptFile: '/public/prompts/cyber_protocol_system_prompt.txt', isJson: true },
+    mcp: { name: 'MCP', operators: ['Inspect', 'Test', 'List Protocols'], promptFile: '/public/prompts/mcp_protocol_system_prompt.txt', isJson: true },
+    help: { name: 'System Help', operators: [], promptFile: '/public/prompts/help_protocol_system_prompt.txt', isJson: false },
 };
 
 export const CRITICAL_SYSTEM_FILES = [
