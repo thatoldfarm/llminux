@@ -1,5 +1,7 @@
 
-# Run and deploy your AI Studio app
+# llminux
+
+An LLM playground for finding out what happens when LLM bugs are turned into features that can be interacted with via a linux-like system running as an ontological operating system with persistant state mechanics. 
 
 This contains everything you need to run your app locally.
 
