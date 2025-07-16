@@ -16,3 +16,6 @@ This contains everything you need to run your app locally.
     `GEMINI_API_KEY=YOUR_API_KEY_HERE`
 4.  Run the app:
     `npm run dev`
+
+Related Projects:
+https://github.com/thatoldfarm/system-prompt
