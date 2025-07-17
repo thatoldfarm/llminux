@@ -15,5 +15,9 @@ An LLM playground for finding out what happens when LLM bugs are turned into fea
 4.  Run the app:
     `npm run dev`
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 Related Projects:
 https://github.com/thatoldfarm/system-prompt
