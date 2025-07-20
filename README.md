@@ -1,7 +1,7 @@
 
-# llminux
+# Run and deploy your AI Studio app
 
-An LLM playground for finding out what happens when LLM bugs are turned into features that can be interacted with via a linux-like system running as an ontological operating system with persistent state mechanics. 
+This contains everything you need to run your app locally.
 
 ## Run Locally
 
@@ -14,10 +14,3 @@ An LLM playground for finding out what happens when LLM bugs are turned into fea
     `GEMINI_API_KEY=YOUR_API_KEY_HERE`
 4.  Run the app:
     `npm run dev`
-
-Related Projects:
-https://github.com/thatoldfarm/system-prompt
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

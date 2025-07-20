@@ -73,8 +73,8 @@ async function main() {
     renderMetisHud();
     debugLog('Initial UI rendering pass finished.');
     
-    debugLog(`Switching to initial file: "${appState.activeFilePath || '0index.html'}".`);
-    await switchFile(appState.activeFilePath || '0index.html');
+    debugLog(`Switching to initial file: "${appState.activeFilePath || '/0index.html'}".`);
+    await switchFile(appState.activeFilePath || '/0index.html');
     debugLog(`Switching to initial tab: "${appState.currentActiveTabId}".`);
     await switchTab(appState.currentActiveTabId);
     

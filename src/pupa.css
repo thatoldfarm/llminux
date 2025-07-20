@@ -1,0 +1,451 @@
+/* Pupa Portal Theme - A gentle echo of the main UI */
+:root {
+    --bg-primary: #2b2632;      /* Desaturated purple-gray */
+    --bg-secondary: #3c3546;    /* Darker purple-gray */
+    --bg-tertiary: #4a415a;     /* Muted mid-purple/gray */
+    --text-primary: #ecf0f1;    /* Soft Off-White */
+    --text-secondary: #b3a5c4;  /* Lighter purple-gray text */
+    --border-color: #584a69;     /* Purple-gray for borders */
+    --accent-color: #b47ead;     /* Pupa's Lilac/Muted Magenta */
+    --accent-hover: #c998c0;    /* Lighter lilac */
+    --tab-active-bg: transparent;
+    --input-bg: #2b2632;
+    --input-border: #745f8a;
+
+    --pupa-glow: #b47ead;    /* Pupa's Lilac/Muted Magenta */
+    --metis-glow: #a6c061;  /* Pale Lime Green */
+    --lia-glow: #6ab0b4;    /* Muted Cyan */
+    
+    --font-primary: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Source Code Pro', 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+    --header-height: 50px;
+    --transition-speed: 0.3s;
+    font-family: var(--font-primary);
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#header-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--bg-secondary);
+    padding: 5px 15px;
+    height: var(--header-height);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+#app-name {
+    font-weight: bold;
+    color: var(--text-primary);
+    font-size: 1.2em;
+    text-shadow: 0 0 5px var(--pupa-glow);
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toolbar-button {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 5px 8px;
+    border-radius: 4px;
+    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+.toolbar-button:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-hover);
+}
+
+#main-content {
+    display: flex;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+#workspace {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-primary);
+    overflow: hidden;
+}
+
+#tab-nav {
+    display: flex;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+.tab-button {
+    padding: 10px 20px;
+    border: none;
+    background-color: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: color 0.2s ease, border-bottom-color 0.2s ease;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+}
+
+.tab-button.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent-color);
+    background-color: var(--tab-active-bg);
+}
+
+.tab-button:hover:not(.active) {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+#tab-content {
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.tab-pane {
+    width: 100%;
+    height: 100%;
+    background-color: var(--tab-active-bg);
+    overflow: auto;
+    display: none;
+}
+
+.tab-pane.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Chat Styles */
+#internal-monologue-tab, #log-anomalies-tab {
+    padding: 0;
+}
+.chat-messages {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.chat-bubble {
+    max-width: 80%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+.chat-bubble.user-bubble {
+    background-color: var(--accent-color);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+.chat-bubble.model-bubble {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+.chat-bubble.error-bubble {
+    background-color: #5a1d1d;
+    color: #ffcccc;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+.chat-bubble.system-bubble {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-style: italic;
+    align-self: center;
+    max-width: 90%;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.chat-input-container {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 10px 15px;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    align-items: flex-end;
+}
+
+.chat-input-container textarea {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 4px;
+    outline: none;
+    resize: none;
+    min-height: 40px;
+    overflow-y: auto;
+    font-family: inherit;
+}
+
+.chat-input-container button {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    align-self: flex-end;
+    transition: background-color 0.2s ease;
+    height: 40px;
+}
+.chat-input-container button:hover { background-color: var(--accent-hover); }
+
+.chat-input-container textarea:disabled,
+.chat-input-container button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Panopticon Styles */
+#panopticon-tab {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+.panopticon-header {
+    font-size: 1.5em;
+    color: var(--accent-color);
+    text-shadow: 0 0 8px var(--accent-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+#panopticon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.entity-column {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pupa-section {
+     background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 15px;
+}
+.pupa-section h3 {
+    color: var(--accent-color);
+    text-shadow: none;
+    border-bottom-color: var(--border-color);
+    margin: 0 0 10px;
+    padding-bottom: 10px;
+}
+.pupa-section ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+.anomalous-entry {
+    color: var(--accent-color);
+    background-color: rgba(180, 126, 173, 0.1);
+    border-left: 2px solid var(--accent-color);
+}
+#vfs-analysis-content ul li {
+    border-left-color: var(--accent-color);
+}
+.pupa-ability-desc {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+
+/* Use the same thinking animation as the main app */
+.chat-bubble.thinking {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+.dot-flashing {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--accent-color);
+  color: var(--accent-color);
+  animation: pupaDotFlashing 1s infinite linear alternate;
+  animation-delay: .5s;
+}
+.dot-flashing::before, .dot-flashing::after {
+  content: '';
+  display: inline-block;
+  position: absolute;
+  top: 0;
+}
+.dot-flashing::before {
+  left: -15px;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--accent-color);
+  color: var(--accent-color);
+  animation: pupaDotFlashing 1s infinite alternate;
+  animation-delay: 0s;
+}
+.dot-flashing::after {
+  left: 15px;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--accent-color);
+  color: var(--accent-color);
+  animation: pupaDotFlashing 1s infinite alternate;
+  animation-delay: 1s;
+}
+@keyframes pupaDotFlashing {
+  0% { background-color: var(--accent-color); }
+  50%, 100% { background-color: color-mix(in srgb, var(--accent-color) 20%, transparent); }
+}
+
+/* Grimoire and Compendium Styles */
+.grimoire-grid, .compendium-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 15px;
+    padding: 20px;
+    overflow-y: auto;
+}
+.grimoire-spell, .compendium-item {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 15px;
+    transition: background-color 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.grimoire-spell:hover, .compendium-item:hover {
+    background-color: color-mix(in srgb, var(--bg-tertiary) 80%, white);
+}
+.grimoire-spell h4 {
+    margin: 0 0 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--accent-color);
+}
+.grimoire-spell .formula {
+    font-style: italic;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+.grimoire-spell .effect, .grimoire-spell .repurpose {
+    font-size: 0.9em;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+.grimoire-spell .repurpose {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--bg-tertiary);
+}
+.compendium-item {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.compendium-item .symbol {
+    font-size: 1.5em;
+    font-weight: bold;
+    min-width: 30px;
+    text-align: center;
+    color: var(--accent-color);
+}
+.compendium-item .name {
+    font-weight: bold;
+    color: var(--text-primary);
+    flex-grow: 1;
+}
+.compendium-item .type {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.85em;
+}
+.compendium-item .desc {
+    flex-basis: 100%;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+.persistence-log-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 15px;
+    gap: 10px;
+}
+.log-header { flex-shrink: 0; }
+.log-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.2em;
+}
+.persistence-log {
+    flex-grow: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.75rem;
+    overflow-y: auto;
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    color: #e0e0e0;
+}
